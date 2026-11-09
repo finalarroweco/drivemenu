@@ -134,10 +134,11 @@ function saveDraft() {
 
 async function load() {
   if (!slug) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
-  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours').eq('slug', slug).maybeSingle();
+  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,subscription_until,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours').eq('slug', slug).maybeSingle();
   if (!r) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
   R = r;
   if (r.is_suspended) { $('root').innerHTML = `<div class="empty">${t('suspended_msg')}</div>`; return; }
+  if (!r.subscription_until || new Date(r.subscription_until) < new Date()) { $('root').innerHTML = `<div class="empty">🍽<br>${esc(App.L(r, 'name'))}<br><span class="muted">${t('unavailable_now')}</span></div>`; return; }
   const [c, m] = await Promise.all([
     sb.from('categories').select('*').eq('restaurant_id', r.id).order('sort_order').order('created_at'),
     sb.from('menu_items').select('*').eq('restaurant_id', r.id).order('sort_order').order('created_at')
@@ -354,6 +355,7 @@ async function placeOrder(e) {
   if (error) {
     const ce = couponErr(error);
     if (ce) { coupon = null; App.toast(ce, 'bad'); renderSheet(); return; }
+    if (/SUBSCRIPTION_INACTIVE/.test(error.message)) { closeSheet(); App.toast(t('unavailable_now'), 'bad'); load(); return; }
     if (/BAD_SCHEDULE|PREORDER_DISABLED/.test(error.message)) { App.toast(t('bad_schedule'), 'bad'); slotIso = ''; renderSheet(); return; }
     App.toast(App.errMsg(error), 'bad'); if (/UNAVAILABLE|NOT_FOUND|CLOSED|SUSPENDED|OPTION/.test(error.message)) load(); return;
   }

@@ -134,6 +134,7 @@ function renderShell() {
         <a class="small" href="${App.menuUrl(R.slug)}" target="_blank" dir="ltr">${App.menuUrl(R.slug).replace(/^https?:\/\//, '')}</a></div>
       <span class="badge ${R.is_suspended ? 'bad' : R.is_open ? 'ok' : 'bad'}">● ${R.is_suspended ? t('suspended') : t(R.is_open ? 'open_now' : 'closed_now')}</span>
     </div>
+    ${subBanner()}
     <nav class="tabs">${tabs.map(k => `<button class="tab ${k === tab ? 'active' : ''}" data-tab="${k}">${t('tab_' + k)}</button>`).join('')}</nav>
     <div id="pane"></div>`;
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderShell(); });
@@ -141,6 +142,17 @@ function renderShell() {
 }
 
 function paneReports() { Reports.renderOwner($('pane'), R); }
+
+function subBanner() {
+  const until = R.subscription_until ? new Date(R.subscription_until) : null, now = new Date();
+  const fmt = d => d.toLocaleDateString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { dateStyle: 'medium' });
+  const mail = `<a class="btn sm primary" href="mailto:sales@drivemenu.app?subject=${encodeURIComponent('DriveMenu · ' + R.slug)}">✉ ${t('sub_contact')}</a>`;
+  if (!until) return `<div class="card flat" style="background:var(--warn-soft);border-color:transparent;margin:10px 0"><div class="row spread wrap"><div><b>🔒 ${t('sub_inactive_title')}</b><div class="small">${t('sub_inactive_body')}</div></div>${mail}</div></div>`;
+  if (until < now) return `<div class="card flat" style="background:var(--bad-soft);border-color:transparent;margin:10px 0"><div class="row spread wrap"><div><b style="color:var(--bad)">⛔ ${t('sub_expired_title')}</b><div class="small">${t('sub_expired_body')}</div></div>${mail}</div></div>`;
+  const days = Math.ceil((until - now) / 864e5);
+  if (days <= 30) return `<div class="card flat" style="background:var(--warn-soft);border-color:transparent;margin:10px 0"><div class="row spread wrap"><b>⏳ ${t('sub_expiring').replace('{d}', days).replace('{date}', fmt(until))}</b>${mail.replace(t('sub_contact'), t('sub_renew'))}</div></div>`;
+  return '';
+}
 
 // ---------- coupons ----------
 let coupons = [];

@@ -18,6 +18,13 @@
   .mock-item { display: flex; justify-content: space-between; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: .9rem; }
   .mock-eta { background: var(--brand); color: #fff; border-radius: 14px; padding: 14px; text-align: center; margin-top: 14px; }
   .mock-eta b { display: block; font-size: 1.8rem; }
+  .pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; padding: 10px 0 70px; }
+  .price-card { background: #fff; border: 2px solid var(--brand); border-radius: 22px; padding: 26px; box-shadow: var(--shadow); }
+  .price-card .amt { font-size: 2.6rem; font-weight: 700; line-height: 1; }
+  .price-card ul { list-style: none; padding: 0; margin: 18px 0 22px; }
+  .price-card li { padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .price-card li::before { content: '✓'; color: var(--ok); font-weight: 700; margin-inline-end: 8px; }
+  @media (max-width: 860px) { .pricing { grid-template-columns: 1fr; } }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; padding-top: 36px; } .feats { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 480px) { .feats { grid-template-columns: 1fr; } }
 </style>
@@ -56,6 +63,24 @@
     <div class="card flat feat"><div class="ic">⏱</div><h3 data-i18n="feat_time"></h3><p data-i18n="feat_time_d"></p></div>
     <div class="card flat feat"><div class="ic">🚗</div><h3 data-i18n="feat_car"></h3><p data-i18n="feat_car_d"></p></div>
   </section>
+
+  <section class="pricing" id="pricing">
+    <div>
+      <h2 style="font-size:clamp(1.6rem,3vw,2.2rem)" data-i18n="sub_title"></h2>
+      <p class="muted" style="font-size:1.1rem" data-i18n="sub_sub"></p>
+    </div>
+    <div class="price-card">
+      <div class="row" style="align-items:baseline;gap:10px"><span class="amt num" data-i18n="sub_price"></span><span class="muted" data-i18n="sub_per_year"></span></div>
+      <ul>
+        <li data-i18n="sub_f1"></li><li data-i18n="sub_f2"></li><li data-i18n="sub_f3"></li>
+        <li data-i18n="sub_f4"></li><li data-i18n="sub_f5"></li><li data-i18n="sub_f6"></li>
+      </ul>
+      <div class="row wrap">
+        <button class="btn primary lg" id="btnPriceSignup" data-i18n="signup"></button>
+        <a class="btn lg" href="mailto:sales@drivemenu.app" data-i18n="sub_contact"></a>
+      </div>
+    </div>
+  </section>
 </main>
 <footer class="container small muted" style="padding:24px 20px 40px;display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line)">
   <span>© DriveMenu</span><a href="/privacy" data-i18n="privacy"></a><a href="/terms" data-i18n="terms"></a>
@@ -76,6 +101,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/assets/config.js"></script>
 <script src="/assets/i18n.js"></script>
+<script src="/assets/i18n-extra.js"></script>
 <script src="/assets/common.js"></script>
 <script>
   let mode = 'login';
@@ -94,6 +120,7 @@
   $('authClose').onclick = () => $('authModal').classList.add('hidden');
   $('authSwitch').onclick = e => { e.preventDefault(); mode = mode === 'login' ? 'signup' : 'login'; renderAuth(); };
   $('btnHeroSignup').onclick = () => openAuth('signup');
+$('btnPriceSignup').onclick = () => openAuth('signup');
   $('btnHeroLogin').onclick = () => openAuth('login');
   document.addEventListener('langchange', renderAuth);
 

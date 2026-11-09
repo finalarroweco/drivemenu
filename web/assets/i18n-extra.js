@@ -39,3 +39,23 @@ Object.assign(I18N.en, {
   install_ios_hint: 'In Safari tap Share, then "Add to Home Screen".',
   notif_new_order: 'New order', notif_tap: 'Tap to open the cashier screen', notif_blocked: 'Notifications are blocked in the browser — enable them in site settings'
 });
+Object.assign(I18N.ar, {
+  sub_price: '250 ر.ع', sub_per_year: 'سنوياً', sub_title: 'اشتراك واحد، كل المزايا', sub_sub: 'بدون عمولة على الطلبات وبدون رسوم مخفية.',
+  sub_f1: 'منيو رقمي وQR للطلب من السيارة', sub_f2: 'شاشة كاشير مباشرة مع تنبيه صوتي', sub_f3: 'طلب مسبق بموعد وكوبونات خصم', sub_f4: 'تقارير المبيعات وساعات الذروة', sub_f5: 'دفع عند الاستلام أو بالبطاقة عبر بوابتك', sub_f6: 'عربي وإنجليزي، وتطبيق للتثبيت',
+  sub_contact: 'تواصل معنا للاشتراك', sub_inactive_title: 'حسابك غير مفعّل بعد', sub_inactive_body: 'جهّز المنيو براحتك، ولما تكون جاهز فعّل الاشتراك السنوي (250 ر.ع) لتبدأ استقبال الطلبات.',
+  sub_expired_title: 'انتهى الاشتراك', sub_expired_body: 'المطعم لا يستقبل طلبات حالياً. جدّد الاشتراك السنوي لتعود الطلبات فوراً.',
+  sub_expiring: 'ينتهي اشتراكك خلال {d} يوم ({date})', sub_active_until: 'الاشتراك فعّال حتى {date}', sub_renew: 'تواصل للتجديد',
+  sub_col: 'الاشتراك', sub_none: 'غير مفعّل', sub_expired: 'منتهي', sub_activate: 'تفعيل سنة', sub_extend: 'تمديد سنة', sub_cancel: 'إلغاء الاشتراك',
+  sub_confirm_cancel: 'إلغاء الاشتراك يوقف استقبال الطلبات فوراً. متأكد؟', sub_subscribed: 'مشتركين', sub_expiring_n: 'ينتهي خلال 30 يوم',
+  unavailable_now: 'المطعم غير متاح للطلب حالياً.'
+});
+Object.assign(I18N.en, {
+  sub_price: '250 OMR', sub_per_year: 'per year', sub_title: 'One plan, everything included', sub_sub: 'No commission on orders and no hidden fees.',
+  sub_f1: 'Digital menu and QR for ordering from the car', sub_f2: 'Live cashier screen with sound alerts', sub_f3: 'Scheduled pre-orders and promo codes', sub_f4: 'Sales reports and peak hours', sub_f5: 'Pay on pickup, or by card through your own gateway', sub_f6: 'Arabic and English, plus an installable app',
+  sub_contact: 'Contact us to subscribe', sub_inactive_title: 'Your account is not activated yet', sub_inactive_body: 'Set up your menu at your own pace. When you are ready, activate the annual plan (250 OMR) to start receiving orders.',
+  sub_expired_title: 'Subscription expired', sub_expired_body: 'The restaurant is not receiving orders. Renew the annual plan to start receiving orders again right away.',
+  sub_expiring: 'Your subscription ends in {d} days ({date})', sub_active_until: 'Subscription active until {date}', sub_renew: 'Contact us to renew',
+  sub_col: 'Subscription', sub_none: 'Not active', sub_expired: 'Expired', sub_activate: 'Activate 1 year', sub_extend: 'Extend 1 year', sub_cancel: 'Cancel subscription',
+  sub_confirm_cancel: 'Cancelling stops orders immediately. Are you sure?', sub_subscribed: 'Subscribed', sub_expiring_n: 'Ending within 30 days',
+  unavailable_now: 'This restaurant is not taking orders right now.'
+});
