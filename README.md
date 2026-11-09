@@ -39,6 +39,7 @@ supabase/migrations/ Database schema, RLS policies and RPC functions, in order
    (see the comment in `005_platform_admin.sql`).
 2. Put the project URL and publishable key in `web/assets/config.js`.
 3. Deploy the `web/` folder to Vercel (root directory = `web`, no build command, framework = Other).
+   The Vercel project is connected to this repository: every push to `main` deploys to production.
 4. Supabase → Authentication → URL Configuration: set the Site URL to the production domain and add it to Redirect URLs.
 
 ## Payments
