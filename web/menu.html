@@ -317,21 +317,12 @@ function renderSheet() {
     s.innerHTML = `
       <div class="row spread"><h2 style="margin:0">${t('payment')}</h2>${step === 'pay' ? `<button class="btn ghost sm" id="shBack">${t('back')}</button>` : ''}</div>
       ${etaBox()}
-      ${pending.payment_mode === 'test' ? `<p class="small" style="background:var(--warn-soft);color:var(--warn);padding:10px 12px;border-radius:10px">${t('test_mode_note')}</p>` : ''}
       ${methodPicker}
-      <form id="payForm" class="stack">
-        <div class="cardbox">💳 VISA / Mastercard</div>
-        <label class="field"><span>${t('card_number')}</span><input id="cc" inputmode="numeric" autocomplete="cc-number" dir="ltr" placeholder="4242 4242 4242 4242" maxlength="23" required></label>
-        <div class="grid2" style="grid-template-columns:1fr 1fr">
-          <label class="field"><span>${t('card_expiry')}</span><input id="exp" inputmode="numeric" autocomplete="cc-exp" dir="ltr" placeholder="12/29" maxlength="5" required></label>
-          <label class="field"><span>${t('card_cvc')}</span><input id="cvc" inputmode="numeric" autocomplete="cc-csc" dir="ltr" placeholder="123" maxlength="4" required></label>
-        </div>
-        <button class="btn primary lg block" type="submit" id="btnPay" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('processing') : t('pay_now') + ' · ' + App.money(pending.total, pending.currency)}</button>
-      </form>`;
+      <div class="cardbox">💳 VISA / Mastercard / OmanNet</div>
+      <p class="small muted">${t('pay_secure_note')}</p>
+      <button class="btn primary lg block" id="btnPay" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('pay_redirecting') : t('pay_thawani') + ' · ' + App.money(pending.total, pending.currency)}</button>`;
     if ($('shBack')) $('shBack').onclick = () => { step = 'cart'; renderSheet(); };
-    $('cc').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim(); };
-    $('exp').oninput = e => { let v = e.target.value.replace(/\D/g, '').slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); e.target.value = v; };
-    $('payForm').onsubmit = pay;
+    $('btnPay').onclick = pay;
     document.querySelectorAll('input[name=pm]').forEach(r => r.onchange = () => { payMethod = r.value; renderSheet(); });
   }
 }
@@ -386,25 +377,13 @@ async function applyCoupon() {
   if (error) { App.toast(couponErr(error) || App.errMsg(error), 'bad'); return; }
   coupon = data; App.toast(t('coupon_ok'), 'ok'); renderSheet();
 }
-function luhn(num) {
-  let sum = 0, alt = false;
-  for (let i = num.length - 1; i >= 0; i--) { let n = +num[i]; if (alt) { n *= 2; if (n > 9) n -= 9; } sum += n; alt = !alt; }
-  return num.length >= 13 && sum % 10 === 0;
-}
-
-async function pay(e) {
-  e.preventDefault();
-  const num = $('cc').value.replace(/\D/g, ''), exp = $('exp').value, cvc = $('cvc').value.replace(/\D/g, '');
-  const [mm, yy] = exp.split('/').map(Number);
-  const expOk = mm >= 1 && mm <= 12 && yy >= 0 && new Date(2000 + yy, mm, 1) > new Date();
-  if (!luhn(num) || !expOk || cvc.length < 3) { App.toast(t('card_invalid'), 'bad'); return; }
+async function pay() {
   step = 'paying'; renderSheet();
-  // Test gateway: card ending 0002 is declined. Live mode will redirect to the real gateway instead.
-  const { error } = await sb.rpc('pay_order_test', {
-    p_order: pending.order_id, p_token: pending.token, p_card_last4: num.slice(-4), p_success: !num.endsWith('0002')
-  });
-  if (error) { const ce = couponErr(error); if (ce) { coupon = null; step = 'cart'; renderSheet(); App.toast(ce, 'bad'); return; } step = 'pay'; renderSheet(); App.toast(App.errMsg(error), 'bad'); return; }
-  done();
+  try { sessionStorage.setItem('pending-pay:' + slug, JSON.stringify(pending)); } catch (e) {}
+  const { data, error } = await App.callFn('thawani', { action: 'checkout', order_id: pending.order_id, token: pending.token, origin: location.origin });
+  if (error) { step = 'pay'; renderSheet(); App.toast(App.errMsg(error), 'bad'); return; }
+  if (data.paid) { done(); return; }
+  location.href = data.url;
 }
 async function confirmCash() {
   step = 'paying'; renderSheet();
@@ -419,6 +398,11 @@ function done() {
 }
 
 document.addEventListener('langchange', () => { if (R) { render(); if (!$('sheetBg').classList.contains('hidden')) renderSheet(); } });
+if (new URLSearchParams(location.search).get('pay') === 'cancelled') {
+  setTimeout(() => App.toast(t('pay_cancelled'), 'bad'), 600);
+  try { const p = JSON.parse(sessionStorage.getItem('pending-pay:' + slug) || 'null'); if (p) { pending = p; payMethod = 'card'; setTimeout(() => { if (R) { step = 'pay'; openSheet(); } }, 900); } } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+}
 load();
 </script>
 </body>

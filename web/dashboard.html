@@ -437,6 +437,36 @@ async function paneStaff() {
   });
 }
 
+// ---------- card gateway (Thawani) ----------
+async function renderGateway() {
+  const box = $('gwBox'); if (!box) return;
+  const { data: g, error } = await sb.rpc('gateway_status', { p_restaurant: R.id });
+  if (!$('gwBox')) return;
+  if (error) { box.innerHTML = `<div class="empty small">${esc(App.errMsg(error))}</div>`; return; }
+  const on = g && g.connected;
+  box.innerHTML = `<div class="row spread"><h3 style="margin:0">💳 ${t('gw_title')}</h3><span class="badge ${on ? 'ok' : ''}">${on ? t('gw_connected') + ' · ' + t(g.mode === 'live' ? 'gw_live' : 'gw_test') : t('gw_not_connected')}</span></div>
+    <p class="small muted">${t('gw_hint')}</p>
+    <form id="fgw" class="stack">
+      <label class="field"><span>${t('gw_mode')}</span><select name="mode" style="max-width:260px"><option value="test" ${!on || g.mode !== 'live' ? 'selected' : ''}>${t('gw_test')}</option><option value="live" ${on && g.mode === 'live' ? 'selected' : ''}>${t('gw_live')}</option></select></label>
+      <label class="field"><span>${t('gw_pk')}</span><input name="pk" dir="ltr" autocomplete="off" required value="${esc((g && g.publishable_key) || '')}"></label>
+      <label class="field"><span>${t('gw_sk')}</span><input name="sk" type="password" dir="ltr" autocomplete="new-password" required placeholder="${on ? esc(g.secret_hint + ' (' + t('gw_sk_saved') + ')') : ''}"></label>
+      <div class="row wrap"><button class="btn primary" id="gwSave">${t('gw_connect')}</button>${on ? `<button class="btn danger" type="button" id="gwOff">${t('gw_disconnect')}</button>` : ''}</div>
+    </form>`;
+  $('fgw').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; $('gwSave').disabled = true;
+    const { error } = await App.callFn('thawani', { action: 'connect', restaurant_id: R.id, mode: f.mode.value, publishable_key: f.pk.value, secret_key: f.sk.value }, true);
+    $('gwSave').disabled = false;
+    if (error) { App.toast(/KEYS_INVALID/.test(error.message) ? t('gw_invalid') : App.errMsg(error), 'bad'); return; }
+    App.toast(t('gw_ok'), 'ok'); await loadMems(R.id);
+  };
+  if ($('gwOff')) $('gwOff').onclick = async () => {
+    if (!confirm(t('gw_confirm_disconnect'))) return;
+    const { error } = await sb.rpc('gateway_disconnect', { p_restaurant: R.id });
+    if (error) return App.toast(App.errMsg(error), 'bad');
+    App.toast(t('saved'), 'ok'); await loadMems(R.id);
+  };
+}
+
 // ---------- settings ----------
 function paneSettings() {
   $('pane').innerHTML = `<div class="card" style="max-width:720px"><form id="fset" class="stack">
@@ -446,7 +476,8 @@ function paneSettings() {
     <div class="grid2"><label class="field"><span>${t('slug')}</span><input name="slug" required dir="ltr" pattern="[a-z0-9][a-z0-9\-]{2,39}" value="${esc(R.slug)}"></label>
     <label class="field"><span>${t('phone')}</span><input name="phone" dir="ltr" value="${esc(R.phone || '')}"></label></div>
     <div class="card flat" style="background:#FBF7F2"><b>${t('payment_methods')}</b>
-      <label class="check" style="margin-top:10px"><input type="checkbox" name="accept_card" ${R.accept_card ? 'checked' : ''}> 💳 ${t('accept_card')}</label>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="accept_card" ${R.accept_card ? 'checked' : ''} ${R.card_provider ? '' : 'disabled'}> 💳 ${t('accept_card')}</label>
+      ${R.card_provider ? '' : `<div class="small muted" style="margin-top:4px">${t('gw_card_needs')}</div>`}
       <label class="check" style="margin-top:8px"><input type="checkbox" name="accept_cash" ${R.accept_cash ? 'checked' : ''}> 💵 ${t('accept_cash')}</label></div>
     <div class="card flat" style="background:#FBF7F2"><b>⏰ ${t('preorder_title')}</b>
       <label class="check" style="margin-top:10px"><input type="checkbox" name="preorder_enabled" ${R.preorder_enabled !== false ? 'checked' : ''}> ${t('preorder_enable')}</label>
@@ -457,13 +488,15 @@ function paneSettings() {
     <label class="field"><span>${t('payment_mode')}</span><select name="payment_mode" disabled><option value="test">${t('mode_test')}</option><option value="live">${t('mode_live')}</option></select></label></div>
     <label class="field"><span>${t('logo')}</span><input type="file" name="logo" accept="image/*"></label>
     ${R.logo_url ? `<img src="${esc(R.logo_url)}" style="width:72px;height:72px;border-radius:16px;object-fit:cover">` : ''}
-    <div><button class="btn primary lg" id="sset">${t('save')}</button></div></form></div>`;
+    <div><button class="btn primary lg" id="sset">${t('save')}</button></div></form></div>
+    <div class="card" style="max-width:720px;margin-top:16px" id="gwBox"><div class="spinner"></div></div>`;
+  renderGateway();
   $('fset').onsubmit = async e => {
     e.preventDefault(); const f = e.target; $('sset').disabled = true;
     try {
       const v = { is_open: f.is_open.checked, name_ar: f.name_ar.value, name_en: f.name_en.value, slug: slugify(f.slug.value), phone: f.phone.value || null,
         base_prep_minutes: +f.base_prep_minutes.value, per_order_load_minutes: +f.per_order_load_minutes.value, currency: f.currency.value,
-        accept_card: f.accept_card.checked, accept_cash: f.accept_cash.checked,
+        accept_card: !!R.card_provider && f.accept_card.checked, accept_cash: f.accept_cash.checked,
         preorder_enabled: f.preorder_enabled.checked, preorder_max_hours: +f.preorder_max_hours.value };
       if (!v.accept_card && !v.accept_cash) throw new Error(t('need_one_method'));
       if (f.logo.files[0]) v.logo_url = await uploadImage(f.logo.files[0], 'logo');

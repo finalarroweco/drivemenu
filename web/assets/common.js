@@ -65,6 +65,15 @@
       if (!opts || !opts.length) return '';
       return ' (' + opts.map(o => App.esc(App.L(o, 'name'))).join(lang === 'ar' ? '، ' : ', ') + ')';
     },
+    async callFn(name, body, auth) {
+      const cfg = window.APP_CONFIG || {};
+      let bearer = cfg.SUPABASE_KEY;
+      if (auth) { const { data } = await sb.auth.getSession(); if (data.session) bearer = data.session.access_token; }
+      const r = await fetch(cfg.SUPABASE_URL + '/functions/v1/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: cfg.SUPABASE_KEY, Authorization: 'Bearer ' + bearer }, body: JSON.stringify(body) });
+      let j = {}; try { j = await r.json(); } catch (e) {}
+      if (!r.ok || j.error) return { error: { message: j.error || ('HTTP ' + r.status), detail: j.detail } };
+      return { data: j };
+    },
     baseUrl() { return location.origin; },
     menuUrl(slug) { return location.origin + '/r/' + slug; },
     async requireAuth() {

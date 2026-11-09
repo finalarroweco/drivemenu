@@ -59,3 +59,19 @@ Object.assign(I18N.en, {
   sub_confirm_cancel: 'Cancelling stops orders immediately. Are you sure?', sub_subscribed: 'Subscribed', sub_expiring_n: 'Ending within 30 days',
   unavailable_now: 'This restaurant is not taking orders right now.'
 });
+Object.assign(I18N.ar, {
+  pay_thawani: 'ادفع بالبطاقة', pay_secure_note: 'رح تنتقل لصفحة الدفع الآمنة من ثواني، وبعد الدفع بترجع لتتبع طلبك.', pay_redirecting: 'جارٍ التحويل لصفحة الدفع…',
+  pay_cancelled: 'ما اكتمل الدفع. تقدر تحاول مرة تانية أو تختار الدفع عند الاستلام.', pay_confirming: 'جارٍ تأكيد الدفع…', pay_not_completed: 'لم يكتمل الدفع', pay_retry: 'إكمال الدفع',
+  gw_title: 'الدفع بالبطاقة (ثواني)', gw_hint: 'اربط حساب التاجر الخاص فيك عند ثواني، والمبالغ بتنزل مباشرة بحسابك. المفاتيح من لوحة تحكم ثواني ← Developers.',
+  gw_mode: 'البيئة', gw_test: 'تجريبي (UAT)', gw_live: 'حقيقي (Live)', gw_pk: 'المفتاح العام (Publishable key)', gw_sk: 'المفتاح السري (Secret key)',
+  gw_connect: 'ربط والتحقق', gw_connected: 'متصل', gw_not_connected: 'غير مربوط', gw_disconnect: 'فصل البوابة', gw_confirm_disconnect: 'فصل البوابة بيوقف الدفع بالبطاقة. متأكد؟',
+  gw_invalid: 'المفاتيح غير صحيحة أو البيئة غلط', gw_ok: 'تم ربط ثواني بنجاح ✓', gw_card_needs: 'فعّل الدفع بالبطاقة بعد ربط بوابة ثواني تحت.', gw_sk_saved: 'محفوظ'
+});
+Object.assign(I18N.en, {
+  pay_thawani: 'Pay by card', pay_secure_note: "You'll go to Thawani's secure payment page, then come back to track your order.", pay_redirecting: 'Redirecting to payment…',
+  pay_cancelled: 'Payment was not completed. Try again or choose pay on pickup.', pay_confirming: 'Confirming payment…', pay_not_completed: 'Payment not completed', pay_retry: 'Complete payment',
+  gw_title: 'Card payments (Thawani)', gw_hint: 'Connect your own Thawani merchant account; payments go straight to your account. Find the keys in Thawani dashboard → Developers.',
+  gw_mode: 'Environment', gw_test: 'Test (UAT)', gw_live: 'Live', gw_pk: 'Publishable key', gw_sk: 'Secret key',
+  gw_connect: 'Connect & verify', gw_connected: 'Connected', gw_not_connected: 'Not connected', gw_disconnect: 'Disconnect', gw_confirm_disconnect: 'Disconnecting stops card payments. Continue?',
+  gw_invalid: 'Invalid keys or wrong environment', gw_ok: 'Thawani connected ✓', gw_card_needs: 'Enable card payments after connecting Thawani below.', gw_sk_saved: 'saved'
+});

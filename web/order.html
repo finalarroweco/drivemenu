@@ -44,12 +44,19 @@ const $ = id => document.getElementById(id), t = k => App.t(k), esc = App.esc;
 const qs = new URLSearchParams(location.search);
 const orderId = qs.get('id') || location.pathname.split('/').filter(Boolean)[1];
 const token = qs.get('t');
-let O = null, offset = 0, lastStatus = null, timer = null;
+let O = null, offset = 0, lastStatus = null, timer = null, verifying = false, payState = null;
 
 async function fetchOrder() {
   const { data, error } = await sb.rpc('get_order', { p_order: orderId, p_token: token });
   if (error) { if (!O) $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
   O = data; offset = new Date(O.server_now).getTime() - Date.now();
+  if (O.status === 'awaiting_payment' && O.payment_provider === 'thawani' && !verifying) {
+    verifying = true;
+    const v = await App.callFn('thawani', { action: 'verify', order_id: orderId, token });
+    verifying = false;
+    if (v.data && v.data.paid) { const again = await sb.rpc('get_order', { p_order: orderId, p_token: token }); if (again.data) O = again.data; }
+    else if (v.data) payState = v.data.gateway_status || 'unpaid';
+  }
   if (lastStatus && lastStatus !== O.status && O.status === 'ready') notifyReady();
   lastStatus = O.status;
   if (document.activeElement && document.activeElement.id === 'spot') return; // don't wipe typing
@@ -102,7 +109,9 @@ function render() {
   if (o.status === 'ready') hero = `<div class="hero ready pulse"><div style="font-size:3rem">✅</div><div class="st">${t('status_ready')}</div><p style="margin:6px 0 0">${t('ready_msg')}</p></div>`;
   else if (o.status === 'cancelled') hero = `<div class="hero cancelled"><div class="st">${t('status_cancelled')}</div></div>`;
   else if (o.status === 'completed') hero = `<div class="hero"><div style="font-size:3rem">🙏</div><div class="st">${t('status_completed')}</div></div>`;
-  else if (o.status === 'awaiting_payment') hero = `<div class="hero"><div class="st">${t('status_awaiting_payment')}</div></div>`;
+  else if (o.status === 'awaiting_payment') hero = o.payment_provider === 'thawani'
+    ? `<div class="hero"><div class="st">${payState ? t('pay_not_completed') : t('pay_confirming')}</div>${payState ? `<button class="btn primary lg" id="btnRetryPay" style="margin-top:12px">💳 ${t('pay_retry')}</button>` : '<div class="spinner" style="border-top-color:#fff"></div>'}</div>`
+    : `<div class="hero"><div class="st">${t('status_awaiting_payment')}</div></div>`;
   else if (o.scheduled_for && left > 60) hero = `<div class="hero"><div style="font-size:2.6rem">⏰</div><div class="small" style="opacity:.8">${t('scheduled_for')}</div><div class="st" style="font-size:1.6rem;margin:4px 0">${esc(whenLabel(o.scheduled_for))}</div><div class="small" style="opacity:.8">${t('in_time').replace('{d}', durLabel(left))}</div></div>`;
   else hero = `<div class="hero"><div class="small" style="opacity:.8">${t('ready_in')}</div>${ring(left, Math.min(o.estimated_minutes || left, Math.max(left, 60)))}<div class="st">${t('status_' + o.status)}</div>${o.scheduled_for ? `<div class="small" style="opacity:.8;margin-top:4px">⏰ ${esc(whenLabel(o.scheduled_for))}</div>` : ''}</div>`;
 
@@ -132,6 +141,12 @@ function render() {
     </div>
     <p class="small muted" style="text-align:center;margin-top:16px">${t('save_link')}</p>
     ${['completed', 'cancelled'].includes(o.status) ? `<a class="btn block lg" href="/r/${esc(r.slug)}">${t('new_order')}</a>` : ''}`;
+  if ($('btnRetryPay')) $('btnRetryPay').onclick = async () => {
+    $('btnRetryPay').disabled = true;
+    const { data, error } = await App.callFn('thawani', { action: 'checkout', order_id: orderId, token, origin: location.origin });
+    if (error) { App.toast(App.errMsg(error), 'bad'); $('btnRetryPay').disabled = false; return; }
+    if (data.paid) { fetchOrder(); return; } location.href = data.url;
+  };
   if ($('btnNotify')) $('btnNotify').onclick = async () => {
     try { await Notification.requestPermission(); } catch (e) {}
     render();
