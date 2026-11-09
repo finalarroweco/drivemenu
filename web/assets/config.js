@@ -1,7 +1,7 @@
 window.APP_CONFIG = {
   SUPABASE_URL: 'https://npkgoyfehoclurspzdvn.supabase.co',
   SUPABASE_KEY: 'sb_publishable_hF_KW3H6TQY7H7FnixEjgA_OthOhnhT',
-  CONTACT_EMAIL: '' // shown on /privacy and /terms
+  CONTACT_EMAIL: 'sales@drivemenu.app' // shown on /privacy and /terms
 };
 
 // Show load problems on screen instead of an endless spinner
