@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF7F2">
+<title>Order</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .hero { text-align: center; padding: 26px 18px; border-radius: 22px; background: var(--ink); color: #fff; margin-top: 10px; }
+  .hero.ready { background: var(--ok); }
+  .hero.cancelled { background: var(--bad); }
+  .hero .num-big { font-size: 4rem; font-weight: 700; line-height: 1; margin: 8px 0 2px; }
+  .hero .st { font-size: 1.25rem; font-weight: 700; }
+  .ring { width: 150px; height: 150px; margin: 12px auto 4px; position: relative; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .lbl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .steps { display: flex; justify-content: space-between; margin: 20px 4px 6px; position: relative; }
+  .steps::before { content: ''; position: absolute; top: 13px; inset-inline: 14px; height: 3px; background: var(--line); }
+  .stp { position: relative; text-align: center; flex: 1; font-size: .78rem; color: var(--muted); font-weight: 600; }
+  .stp i { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 3px solid var(--line); display: grid; place-items: center; margin: 0 auto 6px; font-style: normal; font-size: 13px; }
+  .stp.done i { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .stp.done { color: var(--ink); }
+  .line { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div class="narrow" style="padding-bottom:40px">
+  <div class="row spread" style="padding-top:12px">
+    <a id="backLink" class="small" href="#">← <span data-i18n="menu"></span></a>
+    <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+  </div>
+  <div id="root"><div class="spinner"></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n-extra.js"></script>
+<script src="/assets/common.js"></script>
+<script>
+const $ = id => document.getElementById(id), t = k => App.t(k), esc = App.esc;
+const qs = new URLSearchParams(location.search);
+const orderId = qs.get('id') || location.pathname.split('/').filter(Boolean)[1];
+const token = qs.get('t');
+let O = null, offset = 0, lastStatus = null, timer = null;
+
+async function fetchOrder() {
+  const { data, error } = await sb.rpc('get_order', { p_order: orderId, p_token: token });
+  if (error) { if (!O) $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
+  O = data; offset = new Date(O.server_now).getTime() - Date.now();
+  if (lastStatus && lastStatus !== O.status && O.status === 'ready') notifyReady();
+  lastStatus = O.status;
+  if (document.activeElement && document.activeElement.id === 'spot') return; // don't wipe typing
+  render();
+  if (['completed', 'cancelled'].includes(O.status)) clearInterval(timer);
+}
+
+function notifyReady() {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const r = O.restaurant, title = t('ready_notif_title'), body = App.L(r, 'name') + ' · #' + O.order_number + ' — ' + t('ready_msg');
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(reg => reg.showNotification(title, { body }));
+      else new Notification(title, { body });
+    }
+  } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .25].forEach(d => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.2, ctx.currentTime + d); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + d + .2); o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + .22); });
+  } catch (e) {}
+}
+
+function whenLabel(iso) {
+  const d = new Date(iso), now = new Date(), tz = 'Asia/Muscat', k = x => x.toLocaleDateString('en-CA', { timeZone: tz });
+  const tm = d.toLocaleTimeString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
+  const day = k(d) === k(now) ? t('today') : k(d) === k(new Date(now.getTime() + 864e5)) ? t('tomorrow') : d.toLocaleDateString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
+  return day + ' · ' + tm;
+}
+function durLabel(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return (h ? h + ' ' + t('hours_short') + ' ' : '') + (m || !h ? m + ' ' + t('min_short') : '');
+}
+function ring(left, total) {
+  const pct = Math.max(0, Math.min(1, left / Math.max(total, 1)));
+  const C = 2 * Math.PI * 64;
+  return `<div class="ring"><svg width="150" height="150"><circle cx="75" cy="75" r="64" stroke="rgba(255,255,255,.15)" stroke-width="10" fill="none"/>
+    <circle cx="75" cy="75" r="64" stroke="#E2552B" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" style="transition:stroke-dashoffset .6s"/></svg>
+    <div class="lbl"><div>${left > 0 ? `<div style="font-size:2.6rem;font-weight:700;line-height:1" class="num">${left}</div><div class="small">${t('minutes')}</div>` : `<div style="font-weight:700">${t('ready_soon')}</div>`}</div></div></div>`;
+}
+
+function render() {
+  const o = O, r = o.restaurant;
+  document.title = t('track_title') + ' #' + o.order_number;
+  $('backLink').href = '/r/' + r.slug;
+  const order = ['pending', 'preparing', 'ready', 'completed'];
+  const idx = order.indexOf(o.status);
+  const left = App.minutesLeft(o.estimated_ready_at, offset);
+  let hero;
+  if (o.status === 'ready') hero = `<div class="hero ready pulse"><div style="font-size:3rem">✅</div><div class="st">${t('status_ready')}</div><p style="margin:6px 0 0">${t('ready_msg')}</p></div>`;
+  else if (o.status === 'cancelled') hero = `<div class="hero cancelled"><div class="st">${t('status_cancelled')}</div></div>`;
+  else if (o.status === 'completed') hero = `<div class="hero"><div style="font-size:3rem">🙏</div><div class="st">${t('status_completed')}</div></div>`;
+  else if (o.status === 'awaiting_payment') hero = `<div class="hero"><div class="st">${t('status_awaiting_payment')}</div></div>`;
+  else if (o.scheduled_for && left > 60) hero = `<div class="hero"><div style="font-size:2.6rem">⏰</div><div class="small" style="opacity:.8">${t('scheduled_for')}</div><div class="st" style="font-size:1.6rem;margin:4px 0">${esc(whenLabel(o.scheduled_for))}</div><div class="small" style="opacity:.8">${t('in_time').replace('{d}', durLabel(left))}</div></div>`;
+  else hero = `<div class="hero"><div class="small" style="opacity:.8">${t('ready_in')}</div>${ring(left, Math.min(o.estimated_minutes || left, Math.max(left, 60)))}<div class="st">${t('status_' + o.status)}</div>${o.scheduled_for ? `<div class="small" style="opacity:.8;margin-top:4px">⏰ ${esc(whenLabel(o.scheduled_for))}</div>` : ''}</div>`;
+
+  const showHere = ['pending', 'preparing', 'ready'].includes(o.status);
+  $('root').innerHTML = `
+    <div class="row spread" style="margin-top:14px"><div><div class="small muted">${esc(App.L(r, 'name'))}</div><h1 style="margin:0">${t('order_no')}${o.order_number}</h1></div>
+      ${o.payment_status === 'paid' ? `<span class="badge ok">${o.payment_method === 'cash' ? '💵' : '💳'} ${t('paid')}</span>` : o.payment_status === 'refund_pending' ? `<span class="badge warn">${t('refund_pending')}</span>` : o.payment_method === 'cash' ? `<span class="badge warn">💵 ${t('cash_on_pickup')}</span>` : ''}</div>
+    ${hero}
+    ${['pending', 'preparing'].includes(o.status) && 'Notification' in window && Notification.permission !== 'denied'
+      ? `<button class="btn block" id="btnNotify" style="margin-top:12px" ${Notification.permission === 'granted' ? 'disabled' : ''}>${t(Notification.permission === 'granted' ? 'notify_on' : 'notify_me')}</button>` : ''}
+    ${idx >= 0 ? `<div class="steps">${['status_pending', 'status_preparing', 'col_ready', 'status_completed'].map((k, i) => `<div class="stp ${i <= idx ? 'done' : ''}"><i>${i <= idx ? '✓' : i + 1}</i>${t(k)}</div>`).join('')}</div>` : ''}
+    ${showHere ? (o.arrived_at
+      ? `<div class="card flat" style="margin-top:16px;text-align:center;background:var(--ok-soft);border-color:transparent;color:var(--ok);font-weight:700">📍 ${t('arrived_thanks')}</div>`
+      : `<div class="card flat" style="margin-top:16px"><div class="row"><input id="spot" placeholder="${t('parking_spot')}" value="${esc(o.parking_spot || '')}" dir="ltr"><button class="btn primary lg" id="btnHere">📍 ${t('im_here')}</button></div></div>`) : ''}
+    <div class="card flat" style="margin-top:14px">
+      <div class="small muted">${t('your_car')}</div>
+      <div style="font-weight:700;font-size:1.1rem">🚗 ${esc([o.car_make, o.car_color].filter(Boolean).join(' · '))} <span dir="ltr" class="badge" style="font-size:.95rem">${esc(o.car_plate)}</span></div>
+      ${o.parking_spot ? `<div class="small">P: ${esc(o.parking_spot)}</div>` : ''}
+    </div>
+    <div class="card flat" style="margin-top:14px">
+      <h3 style="font-size:1rem">${t('order_items')}</h3>
+      ${o.items.map(i => `<div class="line"><span>${i.qty}× ${esc(App.L(i, 'name'))}<span class="small muted">${App.optsText(i.options)}</span></span><span class="num">${App.money(i.line_total, o.currency)}</span></div>`).join('')}
+      ${Number(o.discount) ? `<div class="line"><span>${t('subtotal')}</span><span class="num">${App.money(o.subtotal, o.currency)}</span></div><div class="line" style="color:var(--ok)"><span>${t('discount')}${o.coupon_code ? ' · ' + esc(o.coupon_code) : ''}</span><span class="num">−${App.money(o.discount, o.currency)}</span></div>` : ''}
+      <div class="line" style="border:0"><b>${t('total')}</b><b class="num">${App.money(o.total, o.currency)}</b></div>
+      ${o.payment_method === 'cash' && o.payment_status !== 'paid' ? `<div class="small" style="color:var(--warn)">💵 ${t('pay_cash_note')}</div>` : ''}
+      ${o.card_last4 ? `<div class="small muted">${t('paid_card')} •••• ${esc(o.card_last4)}${o.payment_mode === 'test' ? ' (TEST)' : ''}</div>` : ''}
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:16px">${t('save_link')}</p>
+    ${['completed', 'cancelled'].includes(o.status) ? `<a class="btn block lg" href="/r/${esc(r.slug)}">${t('new_order')}</a>` : ''}`;
+  if ($('btnNotify')) $('btnNotify').onclick = async () => {
+    try { await Notification.requestPermission(); } catch (e) {}
+    render();
+  };
+  if ($('btnHere')) $('btnHere').onclick = async () => {
+    $('btnHere').disabled = true;
+    const { error } = await sb.rpc('mark_arrived', { p_order: orderId, p_token: token, p_parking_spot: $('spot').value });
+    if (error) { App.toast(App.errMsg(error), 'bad'); $('btnHere').disabled = false; return; }
+    fetchOrder();
+  };
+}
+
+document.addEventListener('langchange', () => O && render());
+if (!orderId || !token) $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`;
+else { fetchOrder(); timer = setInterval(fetchOrder, 5000); document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchOrder(); }); }
+</script>
+</body>
+</html>

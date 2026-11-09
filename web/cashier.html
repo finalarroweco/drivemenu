@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cashier · DriveMenu</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#E2552B">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  body { background: #F4EFE8; }
+  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 16px; min-height: calc(100vh - 60px); }
+  .col { background: rgba(255,255,255,.5); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .col > div + div > * + * { margin-top: 12px; }
+  .col-h { display: flex; justify-content: space-between; align-items: center; font-weight: 700; padding: 2px 4px; }
+  .cnt { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 10px; font-size: .85rem; }
+  .oc { background: #fff; border-radius: 16px; border: 1px solid var(--line); padding: 14px; box-shadow: var(--shadow); border-inline-start: 5px solid var(--line); }
+  .oc.new { border-inline-start-color: var(--brand); animation: flash 1.2s ease-in-out 3; }
+  .oc.prep { border-inline-start-color: var(--warn); }
+  .oc.ready { border-inline-start-color: var(--ok); }
+  .oc.here { box-shadow: 0 0 0 3px var(--info), var(--shadow); }
+  @keyframes flash { 50% { background: var(--brand-soft); } }
+  .onum { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .car { background: #F6F2EC; border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+  .plate { display: inline-block; border: 2px solid var(--ink); border-radius: 7px; padding: 1px 10px; font-weight: 700; font-size: 1.15rem; letter-spacing: .05em; background: #fff; }
+  .its { margin: 8px 0; font-size: .95rem; }
+  .its > div { padding: 3px 0; }
+  .its b { display: inline-block; min-width: 28px; }
+  .eta { font-weight: 700; }
+  .eta.late { color: var(--bad); }
+  .sched { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--info-soft); color: var(--info); border-radius: 10px; padding: 7px 10px; font-weight: 700; margin-top: 8px; font-size: .9rem; }
+  .sched.due { background: var(--warn-soft); color: var(--warn); }
+  .oc.later { opacity: .8; }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .stepper button { border: 0; background: #fff; width: 34px; height: 34px; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .stepper span { min-width: 56px; text-align: center; font-weight: 700; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .actions .btn { flex: 1; }
+  .stats { display: flex; gap: 18px; }
+  .stats div { font-size: .8rem; color: var(--muted); }
+  .stats b { display: block; color: var(--ink); font-size: 1rem; }
+  @media (max-width: 900px) { .board { grid-template-columns: 1fr; } .stats { display: none; } }
+</style>
+</head>
+<body>
+<header class="topbar" style="background:#fff"><div class="inner" style="padding:0 16px">
+  <a class="logo" href="/dashboard"><span class="logo-mark">🚗</span><span id="rName" data-i18n="cashier_screen"></span></a>
+  <select id="rSel" class="hidden" style="width:auto"></select>
+  <div class="grow"></div>
+  <div class="stats"><div><span data-i18n="today_orders"></span><b id="stOrders" class="num">–</b></div><div><span data-i18n="today_sales"></span><b id="stSales" class="num">–</b></div></div>
+  <span id="live" class="badge">●</span>
+  <button class="btn sm hidden" id="btnInstall">📲 <span data-i18n="install_app"></span></button>
+  <button class="btn sm" id="btnSound">🔔 <span data-i18n="sound_on"></span></button>
+  <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+</div></header>
+
+<main class="board">
+  <section class="col"><div class="col-h"><span data-i18n="col_new"></span><span class="cnt" id="cNew">0</span></div><div id="lNew"></div></section>
+  <section class="col"><div class="col-h"><span data-i18n="col_preparing"></span><span class="cnt" id="cPrep">0</span></div><div id="lPrep"></div></section>
+  <section class="col"><div class="col-h"><span data-i18n="col_ready"></span><span class="cnt" id="cReady">0</span></div><div id="lReady"></div></section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n-extra.js"></script>
+<script src="/assets/common.js"></script>
+<script src="/assets/pwa.js"></script>
+<script>
+const $ = id => document.getElementById(id), t = k => App.t(k), esc = App.esc;
+let R = null, orders = [], adj = {}, seen = new Set(), soundOn = false, audioCtx = null, channel = null, firstLoad = true;
+
+function beep() {
+  if (!soundOn || !audioCtx) return;
+  [0, .18, .36].forEach(d => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.value = d === .18 ? 1175 : 880;
+    o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(.35, audioCtx.currentTime + d);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + d + .16); o.start(audioCtx.currentTime + d); o.stop(audioCtx.currentTime + d + .17); });
+}
+$('btnSound').onclick = () => {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume();
+  soundOn = true; beep(); $('btnSound').innerHTML = '🔔 ' + t('sound_enabled'); $('btnSound').classList.add('ok');
+  PWA.keepAwake();
+  PWA.askNotify().then(ok => { if (!ok && 'Notification' in window && Notification.permission === 'denied') App.toast(t('notif_blocked'), 'bad'); });
+};
+PWA.bindButton($('btnInstall'));
+
+async function init() {
+  const session = await App.requireAuth(); if (!session) return;
+  const { data: mem } = await sb.from('restaurant_members').select('role, restaurants(id,name_ar,name_en,currency,timezone)').eq('user_id', session.user.id);
+  const list = (mem || []).map(m => m.restaurants).filter(Boolean);
+  if (!list.length) { location.href = '/dashboard'; return; }
+  const want = new URLSearchParams(location.search).get('r') || localStorage.getItem('cashier-r');
+  R = list.find(r => r.id === want) || list[0];
+  if (list.length > 1) {
+    $('rSel').classList.remove('hidden');
+    $('rSel').innerHTML = list.map(r => `<option value="${r.id}" ${r.id === R.id ? 'selected' : ''}>${esc(App.L(r, 'name'))}</option>`).join('');
+    $('rSel').onchange = () => { localStorage.setItem('cashier-r', $('rSel').value); location.search = '?r=' + $('rSel').value; };
+  }
+  localStorage.setItem('cashier-r', R.id);
+  $('rName').removeAttribute('data-i18n'); $('rName').textContent = App.L(R, 'name');
+  await fetchOrders(); subscribe();
+  setInterval(render, 20000); setInterval(fetchOrders, 30000);
+}
+
+async function fetchOrders() {
+  const { data, error } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options)')
+    .eq('restaurant_id', R.id).in('status', ['pending', 'preparing', 'ready']).order('created_at');
+  if (error) { App.toast(App.errMsg(error), 'bad'); return; }
+  const fresh = data.filter(o => o.status === 'pending' && !seen.has(o.id));
+  data.forEach(o => seen.add(o.id));
+  if (fresh.length && !firstLoad) {
+    beep(); App.toast(t('new_order_toast') + ' #' + fresh.map(o => o.order_number).join(', #'), 'ok');
+    if (document.hidden || !document.hasFocus()) fresh.forEach(o => PWA.notify(t('notif_new_order') + ' #' + o.order_number, [[o.car_make, o.car_color].filter(Boolean).join(' '), o.car_plate, o.scheduled_for ? '⏰ ' + whenLabel(o.scheduled_for) : ''].filter(Boolean).join(' · ') || t('notif_tap'), '/cashier?r=' + R.id, 'order-' + o.id));
+  }
+  firstLoad = false;
+  orders = data; render(); stats();
+}
+
+async function stats() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const { data } = await sb.from('orders').select('total,status').eq('restaurant_id', R.id).in('status', ['pending', 'preparing', 'ready', 'completed']).gte('created_at', start.toISOString());
+  const ok = data || [];
+  $('stOrders').textContent = ok.length; $('stSales').textContent = App.money(ok.reduce((s, o) => s + Number(o.total), 0), R.currency);
+}
+
+function subscribe() {
+  channel = sb.channel('orders-' + R.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: 'restaurant_id=eq.' + R.id }, () => fetchOrders())
+    .subscribe(s => { $('live').className = 'badge ' + (s === 'SUBSCRIBED' ? 'ok' : 'warn'); $('live').textContent = s === 'SUBSCRIBED' ? '● LIVE' : '● …'; });
+}
+
+function waLink(o) {
+  let ph = String(o.customer_phone || '').replace(/[^\d+]/g, '');
+  if (!ph) return '';
+  if (ph.startsWith('+')) ph = ph.slice(1); else if (ph.startsWith('00')) ph = ph.slice(2); else { const cc = { OMR: '968', AED: '971', SAR: '966', QAR: '974', KWD: '965', BHD: '973', JOD: '962' }[R.currency]; if (cc && !ph.startsWith(cc)) ph = cc + ph.replace(/^0+/, ''); }
+  const url = location.origin + '/o/' + o.id + '?t=' + o.access_token;
+  const msg = t('wa_ready_msg').replace('{n}', o.order_number).replace('{r}', App.L(R, 'name')).replace('{url}', url);
+  return 'https://wa.me/' + ph + '?text=' + encodeURIComponent(msg);
+}
+function whenLabel(iso) {
+  const tz = R.timezone || 'Asia/Muscat', d = new Date(iso), now = new Date(), k = x => x.toLocaleDateString('en-CA', { timeZone: tz });
+  const tm = d.toLocaleTimeString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
+  return (k(d) === k(now) ? '' : (k(d) === k(new Date(now.getTime() + 864e5)) ? t('tomorrow') : d.toLocaleDateString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: tz })) + ' ') + tm;
+}
+function dur(min) { const h = Math.floor(min / 60), m = min % 60; return (h ? h + ' ' + t('hours_short') + ' ' : '') + (m || !h ? m + ' ' + t('min_short') : ''); }
+function baseMin(o) { const l = App.minutesLeft(o.estimated_ready_at); return o.scheduled_for && l != null ? Math.max(5, l) : (o.estimated_minutes ?? 10); }
+function card(o) {
+  const cls = o.status === 'pending' ? 'new' : o.status === 'preparing' ? 'prep' : 'ready';
+  const left = App.minutesLeft(o.estimated_ready_at);
+  const m = adj[o.id] ?? baseMin(o);
+  const far = o.scheduled_for && o.status === 'pending' && left != null && left > 30;
+  const etaTxt = o.status === 'ready' || (o.scheduled_for && o.status === 'pending' && left > 30) ? '' : left == null ? '' : left >= 0
+    ? `<span class="eta">⏱ ${left} ${t('min_short')} ${t('remaining')}</span>` : `<span class="eta late">⚠ ${-left} ${t('min_short')} ${t('late')}</span>`;
+  let actions = '';
+  if (o.status === 'pending') actions = `
+    ${far ? '' : `<div class="row spread" style="margin-top:10px"><span class="small muted">${t('prep_minutes')}</span>
+      <span class="stepper"><button data-adj="${o.id}" data-d="-5">−</button><span class="num">${m} ${t('min_short')}</span><button data-adj="${o.id}" data-d="5">+</button></span></div>`}
+    <div class="actions"><button class="btn primary" data-act="accept" data-id="${o.id}">✓ ${t('accept')}</button></div>`;
+  else if (o.status === 'preparing') actions = `
+    <div class="row spread" style="margin-top:10px"><span class="small muted">${t('adjust_time')}</span>
+      <span class="stepper"><button data-adj="${o.id}" data-d="-5">−</button><span class="num">${m} ${t('min_short')}</span><button data-adj="${o.id}" data-d="5">+</button></span>
+      ${adj[o.id] != null ? `<button class="btn sm" data-act="set_time" data-id="${o.id}">${t('save')}</button>` : ''}</div>
+    <div class="actions"><button class="btn ok" data-act="ready" data-id="${o.id}">🔔 ${t('mark_ready')}</button></div>`;
+  else actions = `<div class="actions">${waLink(o) ? `<a class="btn" style="background:#25D366;border-color:#25D366;color:#fff" href="${waLink(o)}" target="_blank" rel="noopener">📲 ${t('notify_whatsapp')}</a>` : ''}<button class="btn primary" data-act="complete" data-id="${o.id}">🚗 ${t('delivered')}</button></div>`;
+  return `<article class="oc ${cls} ${o.arrived_at ? 'here' : ''} ${far ? 'later' : ''}">
+    <div class="row spread"><span class="onum">#${o.order_number}</span><span class="small muted">${App.timeAgo(o.created_at)}</span></div>
+    ${o.scheduled_for && !['ready'].includes(o.status) ? `<div class="sched ${far ? '' : 'due'}"><span>⏰ ${t('pickup_at')} ${esc(whenLabel(o.scheduled_for))}</span>${far ? `<span class="small">${t('in_time').replace('{d}', dur(left))}</span>` : ''}</div>` : ''}
+    ${o.arrived_at ? `<div class="badge info" style="margin-top:8px">📍 ${t('arrived')}</div>` : ''}
+    <div class="car">
+      <div style="font-weight:700;font-size:1.05rem">🚗 ${esc([o.car_make, o.car_color].filter(Boolean).join(' · ') || '—')}</div>
+      <div class="row wrap" style="margin-top:6px;gap:8px"><span class="plate" dir="ltr">${esc(o.car_plate)}</span>${o.parking_spot ? `<span class="badge">P ${esc(o.parking_spot)}</span>` : ''}</div>
+      ${o.customer_name || o.customer_phone ? `<div class="small muted" style="margin-top:6px">${esc(o.customer_name || '')} ${o.customer_phone ? `· <a href="tel:${esc(o.customer_phone)}" dir="ltr">${esc(o.customer_phone)}</a>` : ''}</div>` : ''}
+    </div>
+    <div class="its">${o.order_items.map(i => `<div><b>${i.qty}×</b> ${esc(App.L(i, 'name'))}${i.options && i.options.length ? `<div class="small" style="color:var(--brand);padding-inline-start:28px">${i.options.map(x => esc(App.L(x, 'name'))).join(' · ')}</div>` : ''}</div>`).join('')}</div>
+    ${o.notes ? `<div class="small" style="background:var(--warn-soft);padding:6px 10px;border-radius:8px">📝 ${esc(o.notes)}</div>` : ''}
+    <div class="row spread" style="margin-top:8px">${o.payment_method === 'cash' && o.payment_status !== 'paid' ? `<span class="badge warn" style="font-size:.9rem">💵 ${t('collect')} ${App.money(o.total, o.currency)}</span>` : `<span class="badge ok">💳 ${t('paid')} ${App.money(o.total, o.currency)}</span>`}${etaTxt}</div>
+    ${o.coupon_code ? `<div class="small" style="color:var(--ok);margin-top:4px">🏷 ${esc(o.coupon_code)} · −${App.money(o.discount, o.currency)}</div>` : ''}
+    ${actions}
+    <div style="text-align:end;margin-top:6px"><button class="btn ghost sm danger" data-act="cancel" data-id="${o.id}">${t('cancel_order')}</button></div>
+  </article>`;
+}
+
+function render() {
+  const by = s => orders.filter(o => o.status === s);
+  const fill = (id, cid, list) => { $(cid).textContent = list.length; $(id).innerHTML = list.length ? list.map(card).join('') : `<div class="empty small">${t('no_orders')}</div>`; };
+  fill('lNew', 'cNew', by('pending').sort((a, b) => new Date(a.estimated_ready_at || a.created_at) - new Date(b.estimated_ready_at || b.created_at))); fill('lPrep', 'cPrep', by('preparing'));
+  fill('lReady', 'cReady', by('ready').sort((a, b) => (b.arrived_at ? 1 : 0) - (a.arrived_at ? 1 : 0)));
+}
+
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-adj]');
+  if (a) { const o = orders.find(x => x.id === a.dataset.adj); adj[o.id] = Math.max(5, Math.min(10080, (adj[o.id] ?? baseMin(o)) + +a.dataset.d)); render(); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = b.dataset.id, act = b.dataset.act;
+  let reason = null;
+  if (act === 'cancel') { reason = prompt(t('cancel_reason')); if (reason === null) return; }
+  b.disabled = true;
+  const minutes = (act === 'accept' || act === 'set_time') ? (adj[id] ?? null) : null;
+  const { error } = await sb.rpc('staff_update_order', { p_order: id, p_action: act, p_minutes: minutes, p_reason: reason });
+  if (error) { App.toast(App.errMsg(error), 'bad'); b.disabled = false; return; }
+  delete adj[id]; fetchOrders();
+});
+
+document.addEventListener('langchange', () => { if (R) { $('rName').textContent = App.L(R, 'name'); render(); } });
+init();
+</script>
+</body>
+</html>

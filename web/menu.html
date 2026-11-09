@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF7F2">
+<title>Menu</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  body { padding-bottom: 110px; }
+  .r-head { padding: 18px 0 8px; display: flex; gap: 14px; align-items: center; }
+  .r-logo { width: 56px; height: 56px; border-radius: 16px; object-fit: cover; background: var(--brand-soft); display: grid; place-items: center; font-size: 26px; flex: none; }
+  .r-head h1 { font-size: 1.35rem; margin: 0; }
+  .cats { position: sticky; top: 0; z-index: 10; background: var(--bg); display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; scrollbar-width: none; }
+  .cats::-webkit-scrollbar { display: none; }
+  .chip { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer; color: var(--ink); }
+  .chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .sec-title { font-size: 1.1rem; margin: 22px 0 10px; }
+  .item { display: flex; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-bottom: 10px; }
+  .item.off { opacity: .5; }
+  .item .info { flex: 1; min-width: 0; }
+  .item h3 { font-size: 1rem; margin: 0 0 2px; }
+  .item p { margin: 0 0 8px; font-size: .86rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .pic { width: 92px; height: 92px; border-radius: 12px; object-fit: cover; flex: none; background: #F3EEE7; }
+  .qty { display: inline-flex; align-items: center; gap: 2px; background: var(--brand-soft); border-radius: 10px; }
+  .qty button { width: 32px; height: 32px; border: 0; background: none; font-size: 18px; font-weight: 700; color: var(--brand); cursor: pointer; }
+  .qty span { min-width: 20px; text-align: center; font-weight: 700; }
+  .cartbar { position: fixed; bottom: 0; inset-inline: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 70%, transparent); z-index: 30; }
+  .cartbar .btn { width: 100%; max-width: 528px; margin: 0 auto; display: flex; justify-content: space-between; padding: 15px 18px; font-size: 1.02rem; border-radius: 15px; box-shadow: 0 10px 24px rgba(226,85,43,.35); }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(28,26,23,.45); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--bg); width: 100%; max-width: 560px; max-height: 94vh; overflow: auto; border-radius: 22px 22px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .line { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .eta { background: var(--ink); color: #fff; border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .eta b { font-size: 1.5rem; }
+  .cardbox { background: linear-gradient(135deg, #2b2724, #4a3f37); color: #fff; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .closed { background: var(--bad-soft); color: var(--bad); border-radius: 12px; padding: 12px 14px; font-weight: 600; margin: 8px 0; }
+  .paym { display: grid; gap: 8px; margin-bottom: 12px; }
+  .paym label { display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 600; cursor: pointer; }
+  .paym label.on { border-color: var(--brand); background: var(--brand-soft); }
+  .paym input { width: 18px; height: 18px; accent-color: var(--brand); }
+  .optg { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; }
+  .optc { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-top: 1px dashed var(--line); cursor: pointer; }
+  .optc:first-of-type { border-top: 0; }
+  .optc input { width: 18px; height: 18px; accent-color: var(--brand); }
+  .optc.on { color: var(--brand); font-weight: 600; }
+  .choice2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .choice2 label { margin: 0; }
+  .coupon-row { display: flex; gap: 8px; margin: 4px 0 6px; }
+  .coupon-row input { text-transform: uppercase; }
+  .coupon-on { display: flex; justify-content: space-between; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 12px; padding: 10px 12px; font-weight: 600; margin: 4px 0 6px; }
+  .lastorder { background: var(--info-soft); color: var(--info); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="narrow">
+  <div class="row spread" style="padding-top:12px">
+    <span class="small muted" data-i18n="tagline"></span>
+    <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+  </div>
+  <div id="root"><div class="spinner"></div></div>
+</div>
+
+<div class="cartbar hidden" id="cartbar">
+  <button class="btn primary" id="btnCart"><span><span data-i18n="cart"></span> · <span id="cartCount"></span></span><span id="cartTotal" class="num"></span></button>
+</div>
+
+<div class="sheet-bg hidden" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n-extra.js"></script>
+<script src="/assets/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const t = k => App.t(k), esc = App.esc;
+const slug = new URLSearchParams(location.search).get('r') || location.pathname.split('/').filter(Boolean)[1];
+let R = null, cats = [], items = [], cart = {}, step = 'cart', pending = null, payMethod = null;
+let when = 'now', slotIso = '', coupon = null, draft = {};
+const CART_KEY = 'cart:' + slug, CAR_KEY = 'car-info';
+
+function loadCart() {
+  try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '{}'); } catch (e) { cart = {}; }
+  for (const k in cart) if (typeof cart[k] === 'number') cart[k] = { id: k, qty: cart[k], opts: {} }; // old format
+}
+function hasOpts(i) { return Array.isArray(i.options) && i.options.length > 0; }
+function lineKey(id, opts) { return id + '|' + JSON.stringify(Object.keys(opts || {}).sort().map(k => [k, [...opts[k]].sort()])); }
+function extrasOf(item, opts) {
+  let x = 0;
+  for (const g of item.options || []) for (const cid of (opts && opts[g.id]) || []) { const c = (g.choices || []).find(c => c.id === cid); if (c) x += Number(c.price || 0); }
+  return x;
+}
+function optsLabel(item, opts) {
+  const names = [];
+  for (const g of item.options || []) for (const cid of (opts && opts[g.id]) || []) { const c = (g.choices || []).find(c => c.id === cid); if (c) names.push(App.L(c, 'name')); }
+  return names.join(App.lang === 'ar' ? '، ' : ', ');
+}
+function itemQty(id) { return Object.values(cart).filter(l => l.id === id).reduce((s, l) => s + l.qty, 0); }
+function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
+function cartLines() {
+  return Object.entries(cart).map(([key, l]) => { const item = items.find(i => i.id === l.id); return { key, item, qty: l.qty, opts: l.opts || {}, unit: item ? Number(item.price) + extrasOf(item, l.opts) : 0 }; })
+    .filter(l => l.item && l.item.is_available && l.qty > 0);
+}
+function cartTotal() { return cartLines().reduce((s, l) => s + l.unit * l.qty, 0); }
+function cartCount() { return cartLines().reduce((s, l) => s + l.qty, 0); }
+function money(v) { return App.money(v, R && R.currency); }
+function tz() { return (R && R.timezone) || 'Asia/Muscat'; }
+function couponDiscount(sub) {
+  if (!coupon) return 0;
+  if (sub < Number(coupon.min_order || 0)) return 0;
+  let d = coupon.kind === 'percent' ? Math.round(sub * Number(coupon.value) * 10) / 1000 : Number(coupon.value);
+  if (coupon.kind === 'percent' && coupon.max_discount) d = Math.min(d, Number(coupon.max_discount));
+  return Math.min(d, sub);
+}
+function dayKey(d) { return d.toLocaleDateString('en-CA', { timeZone: tz() }); }
+function slotLabel(iso) {
+  const d = new Date(iso), now = new Date();
+  const tm = d.toLocaleTimeString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz() });
+  const dk = dayKey(d), today = dayKey(now), tom = dayKey(new Date(now.getTime() + 864e5));
+  const day = dk === today ? t('today') : dk === tom ? t('tomorrow') : d.toLocaleDateString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz() });
+  return day + ' · ' + tm;
+}
+function slots() {
+  const step = 15 * 60000, lead = Math.max(Number(R.base_prep_minutes || 10), 20) * 60000;
+  const start = Math.ceil((Date.now() + lead) / step) * step, end = Date.now() + Number(R.preorder_max_hours || 24) * 3600e3;
+  const out = []; for (let x = start; x <= end && out.length < 700; x += step) out.push(new Date(x).toISOString());
+  return out;
+}
+function saveDraft() {
+  const f = $('carForm'); if (!f) return;
+  draft = Object.fromEntries(new FormData(f).entries());
+  const sl = $('slot'); if (sl) slotIso = sl.value;
+}
+
+async function load() {
+  if (!slug) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
+  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours').eq('slug', slug).maybeSingle();
+  if (!r) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
+  R = r;
+  if (r.is_suspended) { $('root').innerHTML = `<div class="empty">${t('suspended_msg')}</div>`; return; }
+  const [c, m] = await Promise.all([
+    sb.from('categories').select('*').eq('restaurant_id', r.id).order('sort_order').order('created_at'),
+    sb.from('menu_items').select('*').eq('restaurant_id', r.id).order('sort_order').order('created_at')
+  ]);
+  cats = c.data || []; items = m.data || [];
+  loadCart(); render();
+}
+
+function itemHTML(i) {
+  const q = itemQty(i.id), key = lineKey(i.id, {});
+  const ctrl = !i.is_available ? `<span class="badge">${t('unavailable')}</span>`
+    : !R.is_open ? ''
+    : hasOpts(i) ? `<span class="row" style="gap:6px">${q ? `<span class="badge brand">×${q}</span>` : ''}<button class="btn sm primary" data-pick="${i.id}">+ ${t('add_to_cart')}</button></span>`
+    : q ? `<span class="qty"><button data-dec="${esc(key)}" aria-label="-">−</button><span>${q}</span><button data-inc="${esc(key)}" aria-label="+">+</button></span>`
+    : `<button class="btn sm primary" data-add="${i.id}">+ ${t('add_to_cart')}</button>`;
+  return `<div class="item ${i.is_available ? '' : 'off'}">
+    <div class="info"><h3>${esc(App.L(i, 'name'))}</h3>
+      ${App.L(i, 'description') ? `<p>${esc(App.L(i, 'description'))}</p>` : ''}
+      <div class="row spread"><b class="num">${money(i.price)}</b>${ctrl}</div></div>
+    ${i.image_url ? `<img class="pic" src="${esc(i.image_url)}" alt="" loading="lazy">` : ''}
+  </div>`;
+}
+
+function render() {
+  document.title = App.L(R, 'name') + ' · ' + t('menu');
+  const groups = cats.map(c => ({ c, list: items.filter(i => i.category_id === c.id) })).filter(g => g.list.length);
+  const loose = items.filter(i => !i.category_id || !cats.find(c => c.id === i.category_id));
+  if (loose.length) groups.push({ c: { id: 'other', name_ar: 'أخرى', name_en: 'Other' }, list: loose });
+  let last = null; try { last = JSON.parse(localStorage.getItem('last-order:' + slug) || 'null'); } catch (e) {}
+  $('root').innerHTML = `
+    <div class="r-head">
+      ${R.logo_url ? `<img class="r-logo" src="${esc(R.logo_url)}" alt="">` : `<div class="r-logo">🍽</div>`}
+      <div><h1>${esc(App.L(R, 'name'))}</h1><span class="small muted">⏱ ~${R.base_prep_minutes}+ ${t('minutes')}</span></div>
+    </div>
+    ${!R.is_open ? `<div class="closed">${t('closed_msg')}</div>` : ''}
+    ${last && Date.now() - last.at < 6 * 3600e3 ? `<a class="lastorder" href="/o/${last.id}?t=${last.token}"><span>${t('track_title')} #${last.n}</span><span>←</span></a>` : ''}
+    ${groups.length > 1 ? `<nav class="cats">${groups.map(g => `<button class="chip" data-cat="${g.c.id}">${esc(App.L(g.c, 'name'))}</button>`).join('')}</nav>` : ''}
+    ${groups.map(g => `<section id="cat-${g.c.id}"><h2 class="sec-title">${esc(App.L(g.c, 'name'))}</h2>${g.list.map(itemHTML).join('')}</section>`).join('')}
+    ${!items.length ? `<div class="empty">🍳 ${t('menu_empty')}</div>` : ''}`;
+  renderBar();
+}
+
+function renderBar() {
+  const n = cartCount();
+  $('cartbar').classList.toggle('hidden', !n || !R.is_open);
+  $('cartCount').textContent = n; $('cartTotal').textContent = money(cartTotal());
+}
+
+document.addEventListener('click', e => {
+  const inc = e.target.closest('[data-inc]'), dec = e.target.closest('[data-dec]'), cat = e.target.closest('[data-cat]');
+  const add = e.target.closest('[data-add]'), pick = e.target.closest('[data-pick]');
+  if (add) { addLine(add.dataset.add, {}, 1); refresh(); }
+  if (pick) { openPicker(pick.dataset.pick); }
+  if (inc && cart[inc.dataset.inc]) { cart[inc.dataset.inc].qty = Math.min(50, cart[inc.dataset.inc].qty + 1); saveCart(); refresh(); }
+  if (dec && cart[dec.dataset.dec]) { const k = dec.dataset.dec; cart[k].qty -= 1; if (cart[k].qty <= 0) delete cart[k]; saveCart(); refresh(); }
+  if (cat) { document.getElementById('cat-' + cat.dataset.cat)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === cat)); }
+});
+function addLine(id, opts, qty) {
+  const k = lineKey(id, opts);
+  if (cart[k]) cart[k].qty = Math.min(50, cart[k].qty + qty); else cart[k] = { id, qty, opts };
+  saveCart();
+}
+let pickItem = null, pickOpts = {}, pickQty = 1;
+function openPicker(id) {
+  pickItem = items.find(i => i.id === id); pickOpts = {}; pickQty = 1;
+  for (const g of pickItem.options) if (g.required && g.type !== 'multi' && g.choices && g.choices[0]) pickOpts[g.id] = [g.choices[0].id];
+  step = 'item'; openSheet();
+}
+function refresh() { if (!$('sheetBg').classList.contains('hidden') && step !== 'item') renderSheet(); const y = scrollY; render(); scrollTo(0, y); }
+
+$('btnCart').onclick = () => { step = 'cart'; openSheet(); };
+$('sheetBg').onclick = e => { if (e.target === $('sheetBg') && step !== 'paying') closeSheet(); };
+function openSheet() { $('sheetBg').classList.remove('hidden'); document.body.style.overflow = 'hidden'; renderSheet(); }
+function closeSheet() { $('sheetBg').classList.add('hidden'); document.body.style.overflow = ''; }
+
+function getCar() { try { return JSON.parse(localStorage.getItem(CAR_KEY) || '{}'); } catch (e) { return {}; } }
+
+function renderPicker(s) {
+  const i = pickItem, unit = Number(i.price) + extrasOf(i, pickOpts);
+  s.innerHTML = `
+    <div class="row spread"><h2 style="margin:0">${esc(App.L(i, 'name'))}</h2><button class="btn ghost sm" id="shClose">✕</button></div>
+    ${i.image_url ? `<img src="${esc(i.image_url)}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:14px;margin-top:10px">` : ''}
+    ${App.L(i, 'description') ? `<p class="muted small">${esc(App.L(i, 'description'))}</p>` : ''}
+    ${i.options.map(g => `<div class="optg"><div class="row spread"><b>${esc(App.L(g, 'name'))}</b><span class="badge ${g.required ? 'brand' : ''}">${g.required ? t('required') : t('optional')} · ${t(g.type === 'multi' ? 'pick_many' : 'pick_one')}</span></div>
+      ${(g.choices || []).map(c => { const on = (pickOpts[g.id] || []).includes(c.id); return `<label class="optc ${on ? 'on' : ''}"><input type="${g.type === 'multi' ? 'checkbox' : 'radio'}" name="g-${esc(g.id)}" data-g="${esc(g.id)}" data-c="${esc(c.id)}" ${on ? 'checked' : ''}>
+        <span class="grow">${esc(App.L(c, 'name'))}</span>${Number(c.price) ? `<span class="small num">+${money(c.price)}</span>` : ''}</label>`; }).join('')}</div>`).join('')}
+    <div class="row spread" style="margin-top:14px"><span class="qty"><button id="pqDec">−</button><span>${pickQty}</span><button id="pqInc">+</button></span>
+      <button class="btn primary lg" id="pAdd" style="flex:1">${t('add_to_cart_btn')} · ${money(unit * pickQty)}</button></div>`;
+  $('shClose').onclick = closeSheet;
+  s.querySelectorAll('[data-g]').forEach(inp => inp.onchange = () => {
+    const g = i.options.find(x => x.id === inp.dataset.g), cur = new Set(pickOpts[g.id] || []);
+    if (g.type === 'multi') { inp.checked ? cur.add(inp.dataset.c) : cur.delete(inp.dataset.c); pickOpts[g.id] = [...cur]; }
+    else pickOpts[g.id] = [inp.dataset.c];
+    renderPicker(s);
+  });
+  $('pqDec').onclick = () => { pickQty = Math.max(1, pickQty - 1); renderPicker(s); };
+  $('pqInc').onclick = () => { pickQty = Math.min(50, pickQty + 1); renderPicker(s); };
+  $('pAdd').onclick = () => {
+    const miss = i.options.find(g => g.required && !(pickOpts[g.id] || []).length);
+    if (miss) { App.toast(t('option_required') + ': ' + App.L(miss, 'name'), 'bad'); return; }
+    const clean = {}; for (const k in pickOpts) if (pickOpts[k].length) clean[k] = pickOpts[k];
+    addLine(i.id, clean, pickQty); closeSheet(); refresh();
+  };
+}
+function renderSheet() {
+  const s = $('sheet');
+  if (step === 'item') { renderPicker(s); return; }
+  if (step === 'cart') {
+    const lines = cartLines();
+    if (!lines.length) { closeSheet(); return; }
+    saveDraft();
+    const car = Object.assign({}, getCar(), draft);
+    const sub = cartTotal(), disc = couponDiscount(sub);
+    const canSched = R.preorder_enabled !== false;
+    if (!canSched) when = 'now';
+    const sl = canSched && when === 'later' ? slots() : [];
+    if (when === 'later' && sl.length && !sl.includes(slotIso)) slotIso = sl[0];
+    const couponBox = coupon
+      ? `<div class="coupon-on"><span>🏷 ${esc(coupon.code)} · −${money(disc)}${sub < Number(coupon.min_order || 0) ? ` <span class="small" style="color:var(--warn)">(${t('coupon_min').replace('{v}', money(coupon.min_order))})</span>` : ''}</span><button class="btn ghost sm" type="button" id="cpRemove">${t('remove')}</button></div>`
+      : `<div class="coupon-row"><input id="cpCode" placeholder="${t('coupon_ph')}" dir="ltr" maxlength="20" autocomplete="off"><button class="btn" type="button" id="cpApply">${t('apply')}</button></div>`;
+    s.innerHTML = `
+      <div class="row spread"><h2 style="margin:0">${t('cart')}</h2><button class="btn ghost sm" id="shClose">✕</button></div>
+      <div style="margin:10px 0 16px">${lines.map(l => `<div class="line"><div><b>${esc(App.L(l.item, 'name'))}</b>${optsLabel(l.item, l.opts) ? `<div class="small">${esc(optsLabel(l.item, l.opts))}</div>` : ''}<div class="small muted num">${money(l.unit)}</div></div>
+        <div class="row"><span class="qty"><button data-dec="${esc(l.key)}">−</button><span>${l.qty}</span><button data-inc="${esc(l.key)}">+</button></span><b class="num" style="min-width:80px;text-align:end">${money(l.unit * l.qty)}</b></div></div>`).join('')}
+        ${disc ? `<div class="line"><span>${t('subtotal')}</span><span class="num">${money(sub)}</span></div><div class="line" style="color:var(--ok)"><span>${t('discount')}</span><span class="num">−${money(disc)}</span></div>` : ''}
+        <div class="line" style="border:0;font-size:1.1rem"><b>${t('total')}</b><b class="num">${money(sub - disc)}</b></div>
+        ${couponBox}</div>
+      ${canSched ? `<h3>⏰ ${t('pickup_time')}</h3>
+      <div class="paym choice2">
+        <label class="${when === 'now' ? 'on' : ''}"><input type="radio" name="when" value="now" ${when === 'now' ? 'checked' : ''}> ${t('asap')}</label>
+        <label class="${when === 'later' ? 'on' : ''}"><input type="radio" name="when" value="later" ${when === 'later' ? 'checked' : ''}> ${t('schedule_later')}</label></div>
+      ${when === 'later' ? `<select id="slot" style="margin-bottom:14px">${sl.map(x => `<option value="${x}" ${x === slotIso ? 'selected' : ''}>${esc(slotLabel(x))}</option>`).join('')}</select>` : ''}` : ''}
+      <h3>🚗 ${t('car_info')}</h3>
+      <form id="carForm" class="stack">
+        <div class="grid2">
+          <label class="field"><span>${t('car_make')}</span><input name="car_make" value="${esc(car.car_make || '')}" placeholder="Toyota Camry"></label>
+          <label class="field"><span>${t('car_color')}</span><input name="car_color" value="${esc(car.car_color || '')}"></label>
+        </div>
+        <div class="grid2">
+          <label class="field"><span>${t('car_plate')} *</span><input name="car_plate" required value="${esc(car.car_plate || '')}" dir="ltr"></label>
+          <label class="field"><span>${t('parking_spot')}</span><input name="parking_spot" dir="ltr" value="${esc(car.parking_spot || '')}"></label>
+        </div>
+        <div class="grid2">
+          <label class="field"><span>${t('your_name')}</span><input name="name" value="${esc(car.name || '')}" autocomplete="name"></label>
+          <label class="field"><span>${t('your_phone')} *</span><input name="phone" type="tel" required minlength="7" pattern="[+0-9 ]{7,20}" value="${esc(car.phone || '')}" dir="ltr" autocomplete="tel" placeholder="9xxxxxxx"></label>
+        </div>
+        <label class="field"><span>${t('notes')}</span><textarea name="notes" rows="2">${esc(car.notes || '')}</textarea></label>
+        <p class="small muted" style="text-align:center;margin:0">${t('agree_note')} <a href="/terms" target="_blank">${t('terms')}</a> ${t('and')} <a href="/privacy" target="_blank">${t('privacy')}</a></p>
+        <button class="btn primary lg block" type="submit" id="btnPlace">${when === 'later' ? '⏰ ' + t('schedule_order') : t('checkout')} · ${money(sub - disc)}</button>
+      </form>`;
+    $('shClose').onclick = closeSheet;
+    $('carForm').onsubmit = placeOrder;
+    s.querySelectorAll('input[name=when]').forEach(r => r.onchange = () => { saveDraft(); when = r.value; renderSheet(); });
+    if ($('slot')) $('slot').onchange = e => { slotIso = e.target.value; };
+    if ($('cpRemove')) $('cpRemove').onclick = () => { saveDraft(); coupon = null; renderSheet(); };
+    if ($('cpApply')) { $('cpApply').onclick = applyCoupon; $('cpCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); } }; }
+  } else if (step === 'pay' || step === 'paying') {
+    const canCard = pending.accept_card !== false, canCash = !!pending.accept_cash;
+    if (!payMethod || (payMethod === 'card' && !canCard) || (payMethod === 'cash' && !canCash)) payMethod = canCard ? 'card' : 'cash';
+    const methodPicker = canCard && canCash ? `<div class="paym">
+        <label class="${payMethod === 'card' ? 'on' : ''}"><input type="radio" name="pm" value="card" ${payMethod === 'card' ? 'checked' : ''}> 💳 ${t('pay_card')}</label>
+        <label class="${payMethod === 'cash' ? 'on' : ''}"><input type="radio" name="pm" value="cash" ${payMethod === 'cash' ? 'checked' : ''}> 💵 ${t('pay_cash')}</label></div>` : '';
+    if (payMethod === 'cash') {
+      s.innerHTML = `
+      <div class="row spread"><h2 style="margin:0">${t('pay_method')}</h2>${step === 'pay' ? `<button class="btn ghost sm" id="shBack">${t('back')}</button>` : ''}</div>
+      ${etaBox()}
+      ${methodPicker}
+      <p class="small" style="background:var(--ok-soft);color:var(--ok);padding:10px 12px;border-radius:10px">💵 ${t('pay_cash_note')}</p>
+      <button class="btn primary lg block" id="btnCash" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('processing') : t('confirm_order') + ' · ' + App.money(pending.total, pending.currency)}</button>`;
+      if ($('shBack')) $('shBack').onclick = () => { step = 'cart'; renderSheet(); };
+      document.querySelectorAll('input[name=pm]').forEach(r => r.onchange = () => { payMethod = r.value; renderSheet(); });
+      $('btnCash').onclick = confirmCash;
+      return;
+    }
+    s.innerHTML = `
+      <div class="row spread"><h2 style="margin:0">${t('payment')}</h2>${step === 'pay' ? `<button class="btn ghost sm" id="shBack">${t('back')}</button>` : ''}</div>
+      ${etaBox()}
+      ${pending.payment_mode === 'test' ? `<p class="small" style="background:var(--warn-soft);color:var(--warn);padding:10px 12px;border-radius:10px">${t('test_mode_note')}</p>` : ''}
+      ${methodPicker}
+      <form id="payForm" class="stack">
+        <div class="cardbox">💳 VISA / Mastercard</div>
+        <label class="field"><span>${t('card_number')}</span><input id="cc" inputmode="numeric" autocomplete="cc-number" dir="ltr" placeholder="4242 4242 4242 4242" maxlength="23" required></label>
+        <div class="grid2" style="grid-template-columns:1fr 1fr">
+          <label class="field"><span>${t('card_expiry')}</span><input id="exp" inputmode="numeric" autocomplete="cc-exp" dir="ltr" placeholder="12/29" maxlength="5" required></label>
+          <label class="field"><span>${t('card_cvc')}</span><input id="cvc" inputmode="numeric" autocomplete="cc-csc" dir="ltr" placeholder="123" maxlength="4" required></label>
+        </div>
+        <button class="btn primary lg block" type="submit" id="btnPay" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('processing') : t('pay_now') + ' · ' + App.money(pending.total, pending.currency)}</button>
+      </form>`;
+    if ($('shBack')) $('shBack').onclick = () => { step = 'cart'; renderSheet(); };
+    $('cc').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim(); };
+    $('exp').oninput = e => { let v = e.target.value.replace(/\D/g, '').slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); e.target.value = v; };
+    $('payForm').onsubmit = pay;
+    document.querySelectorAll('input[name=pm]').forEach(r => r.onchange = () => { payMethod = r.value; renderSheet(); });
+  }
+}
+
+async function placeOrder(e) {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target).entries());
+  if (!f.car_plate.trim()) { App.toast(t('plate_required'), 'bad'); return; }
+  if (f.phone.replace(/\D/g, '').length < 7) { App.toast(t('phone_required'), 'bad'); return; }
+  try { localStorage.setItem(CAR_KEY, JSON.stringify({ car_make: f.car_make, car_color: f.car_color, car_plate: f.car_plate, name: f.name, phone: f.phone })); } catch (er) {}
+  draft = f;
+  const cust = Object.assign({}, f);
+  delete cust.when;
+  if (coupon) cust.coupon = coupon.code;
+  if (when === 'later') { cust.scheduled_for = ($('slot') && $('slot').value) || slotIso; if (!cust.scheduled_for) { App.toast(t('bad_schedule'), 'bad'); return; } }
+  $('btnPlace').disabled = true;
+  const { data, error } = await sb.rpc('place_order', {
+    p_slug: slug, p_items: cartLines().map(l => ({ id: l.item.id, qty: l.qty, options: l.opts })), p_customer: cust
+  });
+  if ($('btnPlace')) $('btnPlace').disabled = false;
+  if (error) {
+    const ce = couponErr(error);
+    if (ce) { coupon = null; App.toast(ce, 'bad'); renderSheet(); return; }
+    if (/BAD_SCHEDULE|PREORDER_DISABLED/.test(error.message)) { App.toast(t('bad_schedule'), 'bad'); slotIso = ''; renderSheet(); return; }
+    App.toast(App.errMsg(error), 'bad'); if (/UNAVAILABLE|NOT_FOUND|CLOSED|SUSPENDED|OPTION/.test(error.message)) load(); return;
+  }
+  pending = data; step = 'pay'; renderSheet();
+}
+
+function etaBox() {
+  const sched = pending.scheduled_for ? `<span>⏰ ${t('pickup_at')}</span><span><b style="font-size:1.1rem">${esc(slotLabel(pending.scheduled_for))}</b></span>`
+    : `<span>⏱ ${t('est_time')}</span><span><b class="num">${pending.estimated_minutes}</b> ${t('minutes')}</span>`;
+  return `<div class="eta" style="margin:14px 0">${sched}</div>
+    ${Number(pending.discount) ? `<div class="line"><span>${t('subtotal')}</span><span class="num">${App.money(pending.subtotal, pending.currency)}</span></div><div class="line" style="color:var(--ok)"><span>${t('discount')}</span><span class="num">−${App.money(pending.discount, pending.currency)}</span></div>` : ''}
+    <div class="line" style="font-size:1.1rem;border:0;margin-bottom:8px"><b>${t('total')}</b><b class="num">${App.money(pending.total, pending.currency)}</b></div>`;
+}
+function couponErr(error) {
+  const m = (error && error.message) || '';
+  const mm = m.match(/COUPON_MIN_ORDER:([\d.]+)/);
+  if (mm) return t('coupon_min').replace('{v}', money(mm[1]));
+  for (const k of ['COUPON_EXPIRED', 'COUPON_NOT_STARTED', 'COUPON_USED_UP', 'COUPON_PHONE_LIMIT', 'COUPON_INVALID']) if (m.includes(k)) return t(k.toLowerCase());
+  return null;
+}
+async function applyCoupon() {
+  const code = ($('cpCode').value || '').trim().toUpperCase();
+  if (!code) return;
+  saveDraft();
+  $('cpApply').disabled = true;
+  const { data, error } = await sb.rpc('check_coupon', { p_slug: slug, p_code: code, p_subtotal: cartTotal(), p_phone: draft.phone || null });
+  if ($('cpApply')) $('cpApply').disabled = false;
+  if (error) { App.toast(couponErr(error) || App.errMsg(error), 'bad'); return; }
+  coupon = data; App.toast(t('coupon_ok'), 'ok'); renderSheet();
+}
+function luhn(num) {
+  let sum = 0, alt = false;
+  for (let i = num.length - 1; i >= 0; i--) { let n = +num[i]; if (alt) { n *= 2; if (n > 9) n -= 9; } sum += n; alt = !alt; }
+  return num.length >= 13 && sum % 10 === 0;
+}
+
+async function pay(e) {
+  e.preventDefault();
+  const num = $('cc').value.replace(/\D/g, ''), exp = $('exp').value, cvc = $('cvc').value.replace(/\D/g, '');
+  const [mm, yy] = exp.split('/').map(Number);
+  const expOk = mm >= 1 && mm <= 12 && yy >= 0 && new Date(2000 + yy, mm, 1) > new Date();
+  if (!luhn(num) || !expOk || cvc.length < 3) { App.toast(t('card_invalid'), 'bad'); return; }
+  step = 'paying'; renderSheet();
+  // Test gateway: card ending 0002 is declined. Live mode will redirect to the real gateway instead.
+  const { error } = await sb.rpc('pay_order_test', {
+    p_order: pending.order_id, p_token: pending.token, p_card_last4: num.slice(-4), p_success: !num.endsWith('0002')
+  });
+  if (error) { const ce = couponErr(error); if (ce) { coupon = null; step = 'cart'; renderSheet(); App.toast(ce, 'bad'); return; } step = 'pay'; renderSheet(); App.toast(App.errMsg(error), 'bad'); return; }
+  done();
+}
+async function confirmCash() {
+  step = 'paying'; renderSheet();
+  const { error } = await sb.rpc('confirm_cash_order', { p_order: pending.order_id, p_token: pending.token });
+  if (error) { const ce = couponErr(error); if (ce) { coupon = null; step = 'cart'; renderSheet(); App.toast(ce, 'bad'); return; } step = 'pay'; renderSheet(); App.toast(App.errMsg(error), 'bad'); return; }
+  done();
+}
+function done() {
+  try { localStorage.setItem('last-order:' + slug, JSON.stringify({ id: pending.order_id, token: pending.token, n: pending.order_number, at: Date.now() })); } catch (er) {}
+  cart = {}; saveCart(); coupon = null; when = 'now';
+  location.href = `/o/${pending.order_id}?t=${pending.token}`;
+}
+
+document.addEventListener('langchange', () => { if (R) { render(); if (!$('sheetBg').classList.contains('hidden')) renderSheet(); } });
+load();
+</script>
+</body>
+</html>

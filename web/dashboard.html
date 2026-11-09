@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · DriveMenu</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#E2552B">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .cat-row, .it-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .it-row img, .it-row .ph { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: #F3EEE7; flex: none; }
+  .it-row .nm { flex: 1; min-width: 0; }
+  .it-row .nm b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu-grid { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+  .qr-wrap { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
+  #qrBox { background: #fff; padding: 18px; border-radius: 18px; border: 1px solid var(--line); text-align: center; }
+  #qrBox canvas, #qrBox img { margin: 0 auto; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi b { display: block; font-size: 1.5rem; }
+  .switch { position: relative; width: 44px; height: 26px; flex: none; display: inline-block; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: #D8D0C5; border-radius: 99px; transition: .2s; cursor: pointer; }
+  .switch span::before { content: ''; position: absolute; width: 20px; height: 20px; top: 3px; inset-inline-start: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + span { background: var(--ok); }
+  [dir=rtl] .switch input:checked + span::before { transform: translateX(-18px); }
+  [dir=ltr] .switch input:checked + span::before { transform: translateX(18px); }
+  .og { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-top: 10px; }
+  .og input, .og select { padding: 8px 10px; }
+  .modal { max-width: 640px; }
+  tr.fresh { animation: fresh 2s ease-out; }
+  @keyframes fresh { 0% { background: var(--brand-soft); } 100% { background: transparent; } }
+  @media (max-width: 820px) { .menu-grid, .qr-wrap { grid-template-columns: 1fr; } .kpis { grid-template-columns: 1fr; } }
+  @media print { body * { visibility: hidden; } #printArea, #printArea * { visibility: visible; } #printArea { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="container inner">
+  <a class="logo" href="/"><span class="logo-mark">🚗</span><span data-i18n="brand"></span></a>
+  <select id="rSel" class="hidden" style="width:auto;max-width:220px"></select>
+  <div class="grow"></div>
+  <button class="btn sm hidden" id="btnInstall">📲 <span data-i18n="install_app"></span></button>
+  <a class="btn sm hidden" id="btnAdmin" href="/admin">🛡 <span data-i18n="admin"></span></a>
+  <a class="btn sm primary hidden" id="btnCashier" href="/cashier">🖥 <span data-i18n="cashier_screen"></span></a>
+  <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+  <button class="btn ghost sm" id="btnLogout" data-i18n="logout"></button>
+</div></header>
+
+<main class="container" style="padding-top:22px;padding-bottom:60px">
+  <div id="root"><div class="spinner"></div></div>
+</main>
+
+<div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal"></div></div>
+<div id="printArea" class="hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n-extra.js"></script>
+<script src="/assets/common.js"></script>
+<script src="/assets/pwa.js"></script>
+<script src="/assets/reports.js"></script>
+<script>
+const $ = id => document.getElementById(id), t = k => App.t(k), esc = App.esc;
+let user = null, mems = [], R = null, role = null, tab = 'menu', cats = [], items = [];
+
+$('btnLogout').onclick = async () => { await sb.auth.signOut(); location.href = '/'; };
+PWA.bindButton($('btnInstall'));
+
+async function init() {
+  const s = await App.requireAuth(); if (!s) return;
+  user = s.user;
+  sb.rpc('is_platform_admin').then(({ data }) => { if (data) $('btnAdmin').classList.remove('hidden'); });
+  await loadMems();
+}
+
+async function loadMems(selectId) {
+  const { data, error } = await sb.from('restaurant_members').select('role, restaurants(*)').eq('user_id', user.id).order('created_at');
+  if (error) { App.toast(App.errMsg(error), 'bad'); return; }
+  mems = (data || []).filter(m => m.restaurants);
+  if (!mems.length) { R = null; renderCreate(); return; }
+  const want = selectId || localStorage.getItem('dash-r');
+  const m = mems.find(x => x.restaurants.id === want) || mems[0];
+  if (R && R.id !== m.restaurants.id) { stopOrdersLive(); seenOrders = null; }
+  R = m.restaurants; role = m.role; localStorage.setItem('dash-r', R.id);
+  if (role !== 'owner' && ['menu', 'staff', 'settings', 'reports', 'coupons'].includes(tab)) tab = 'orders';
+  $('rSel').classList.remove('hidden');
+  $('rSel').innerHTML = mems.map(x => `<option value="${x.restaurants.id}" ${x.restaurants.id === R.id ? 'selected' : ''}>${esc(App.L(x.restaurants, 'name'))}</option>`).join('')
+    + `<option value="__new">+ ${t('new_restaurant')}</option>`;
+  $('rSel').onchange = () => { if ($('rSel').value === '__new') { stopOrdersLive(); renderCreate(); } else loadMems($('rSel').value); };
+  $('btnCashier').classList.remove('hidden'); $('btnCashier').href = '/cashier?r=' + R.id;
+  renderShell();
+}
+
+// ---------- create restaurant ----------
+function slugify(s) { return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40); }
+function renderCreate() {
+  $('root').innerHTML = `<div class="narrow" style="padding:0">
+    ${!mems.length ? `<p class="muted">${t('no_restaurants')}</p>` : ''}
+    <div class="card"><h2>${t('new_restaurant')}</h2>
+    <form id="fNew" class="stack">
+      <div class="grid2"><label class="field"><span>${t('name_ar')}</span><input name="name_ar" required></label>
+      <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr"></label></div>
+      <label class="field"><span>${t('slug')}</span><input name="slug" required dir="ltr" pattern="[a-z0-9][a-z0-9\-]{2,39}" placeholder="${t('slug_hint')}"></label>
+      <div class="small muted" dir="ltr" id="slugPrev"></div>
+      <div class="grid2"><label class="field"><span>${t('phone')}</span><input name="phone" dir="ltr"></label>
+      <label class="field"><span>${t('currency')}</span><select name="currency">${['OMR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'JOD', 'USD'].map(c => `<option>${c}</option>`).join('')}</select></label></div>
+      <div class="row"><button class="btn primary lg" type="submit">${t('create')}</button>${mems.length ? `<button class="btn lg" type="button" id="cNewCancel">${t('cancel')}</button>` : ''}</div>
+    </form></div></div>`;
+  const f = $('fNew');
+  f.name_en.oninput = () => { if (!f.slug.dataset.touched) f.slug.value = slugify(f.name_en.value); f.slug.oninput(); };
+  f.slug.oninput = () => { $('slugPrev').textContent = App.menuUrl(f.slug.value || '…'); };
+  f.slug.addEventListener('keydown', () => f.slug.dataset.touched = 1);
+  if ($('cNewCancel')) $('cNewCancel').onclick = () => loadMems(R && R.id);
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(f).entries()); v.slug = slugify(v.slug);
+    if (!v.phone) delete v.phone;
+    const { data, error } = await sb.from('restaurants').insert({ ...v, owner_id: user.id }).select().single();
+    if (error) { App.toast(App.errMsg(error), 'bad'); return; }
+    tab = 'menu'; await loadMems(data.id);
+  };
+}
+
+// ---------- shell ----------
+function renderShell() {
+  const tabs = role === 'owner' ? ['menu', 'qr', 'orders', 'reports', 'coupons', 'staff', 'settings'] : ['qr', 'orders'];
+  $('root').innerHTML = `
+    <div class="row spread wrap" style="margin-bottom:6px">
+      <div><h1 style="margin:0">${esc(App.L(R, 'name'))}</h1>
+        <a class="small" href="${App.menuUrl(R.slug)}" target="_blank" dir="ltr">${App.menuUrl(R.slug).replace(/^https?:\/\//, '')}</a></div>
+      <span class="badge ${R.is_suspended ? 'bad' : R.is_open ? 'ok' : 'bad'}">● ${R.is_suspended ? t('suspended') : t(R.is_open ? 'open_now' : 'closed_now')}</span>
+    </div>
+    <nav class="tabs">${tabs.map(k => `<button class="tab ${k === tab ? 'active' : ''}" data-tab="${k}">${t('tab_' + k)}</button>`).join('')}</nav>
+    <div id="pane"></div>`;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderShell(); });
+  ({ menu: paneMenu, qr: paneQR, orders: paneOrders, reports: paneReports, coupons: paneCoupons, staff: paneStaff, settings: paneSettings })[tab]();
+}
+
+function paneReports() { Reports.renderOwner($('pane'), R); }
+
+// ---------- coupons ----------
+let coupons = [];
+const toLocalInput = iso => { if (!iso) return ''; const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+const fmtDT = iso => iso ? new Date(iso).toLocaleString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+function couponState(c) {
+  const now = Date.now();
+  if (!c.is_active) return ['', t('cp_off')];
+  if (c.ends_at && new Date(c.ends_at) <= now) return ['bad', t('cp_expired')];
+  if (c.starts_at && new Date(c.starts_at) > now) return ['info', t('cp_scheduled')];
+  if (c.max_uses && c.uses >= c.max_uses) return ['warn', t('cp_used_up')];
+  return ['ok', t('cp_active')];
+}
+async function paneCoupons() {
+  $('pane').innerHTML = '<div class="spinner"></div>';
+  const { data, error } = await sb.rpc('list_coupons', { p_restaurant: R.id });
+  if (tab !== 'coupons') return;
+  if (error) { $('pane').innerHTML = `<div class="empty">${esc(App.errMsg(error))}</div>`; return; }
+  coupons = data || [];
+  const val = c => c.kind === 'percent' ? `${Number(c.value)}%${c.max_discount ? ` <span class="small muted">(${t('cp_max')} ${App.money(c.max_discount, R.currency)})</span>` : ''}` : App.money(c.value, R.currency);
+  $('pane').innerHTML = `<div class="card" style="overflow-x:auto">
+    <div class="row spread" style="margin-bottom:6px"><div><h2 style="margin:0">${t('tab_coupons')}</h2><div class="small muted">${t('cp_hint')}</div></div><button class="btn primary" id="addCp">+ ${t('cp_new')}</button></div>
+    ${coupons.length ? `<table><thead><tr><th>${t('cp_code')}</th><th>${t('cp_value')}</th><th>${t('cp_conditions')}</th><th>${t('cp_uses')}</th><th>${t('cp_given')}</th><th></th><th></th></tr></thead><tbody>
+    ${coupons.map(c => { const [cls, lbl] = couponState(c); return `<tr>
+      <td><b dir="ltr" style="font-family:ui-monospace,monospace;letter-spacing:.5px">${esc(c.code)}</b></td>
+      <td class="num">${val(c)}</td>
+      <td class="small">${[Number(c.min_order) ? t('cp_min_short') + ' ' + App.money(c.min_order, R.currency) : '', c.per_phone_limit ? t('cp_per_phone_short').replace('{n}', c.per_phone_limit) : '', c.ends_at ? t('cp_until') + ' ' + fmtDT(c.ends_at) : ''].filter(Boolean).join(' · ') || '—'}</td>
+      <td class="num">${c.uses}${c.max_uses ? ' / ' + c.max_uses : ''}</td>
+      <td class="num">${App.money(c.discount_total, R.currency)}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td style="text-align:end;white-space:nowrap"><label class="switch" title="${t('cp_active')}"><input type="checkbox" data-cpon="${c.id}" ${c.is_active ? 'checked' : ''}><span></span></label>
+        <button class="btn ghost sm" data-ecp="${c.id}">${t('edit')}</button></td></tr>`; }).join('')}
+    </tbody></table>` : `<div class="empty">🏷 ${t('cp_empty')}</div>`}</div>`;
+  $('addCp').onclick = () => couponModal();
+  document.querySelectorAll('[data-ecp]').forEach(b => b.onclick = () => couponModal(coupons.find(c => c.id === b.dataset.ecp)));
+  document.querySelectorAll('[data-cpon]').forEach(cb => cb.onchange = async () => {
+    const { error } = await sb.from('coupons').update({ is_active: cb.checked }).eq('id', cb.dataset.cpon);
+    if (error) { App.toast(App.errMsg(error), 'bad'); cb.checked = !cb.checked; return; }
+    paneCoupons();
+  });
+}
+function couponModal(c) {
+  openModal(`<h2>${c ? t('edit') : t('cp_new')}</h2><form id="fcp" class="stack">
+    <label class="field"><span>${t('cp_code')}</span><input name="code" required dir="ltr" maxlength="20" style="text-transform:uppercase" value="${esc(c?.code || '')}" placeholder="WELCOME10"></label>
+    <div class="grid2"><label class="field"><span>${t('cp_type')}</span><select name="kind"><option value="percent" ${c?.kind !== 'amount' ? 'selected' : ''}>${t('cp_percent')}</option><option value="amount" ${c?.kind === 'amount' ? 'selected' : ''}>${t('cp_amount')} (${R.currency})</option></select></label>
+    <label class="field"><span>${t('cp_value')}</span><input name="value" type="number" step="0.001" min="0.001" required dir="ltr" value="${c ? Number(c.value) : ''}"></label></div>
+    <div class="grid2"><label class="field"><span>${t('cp_min_order')} (${R.currency})</span><input name="min_order" type="number" step="0.001" min="0" dir="ltr" value="${c ? Number(c.min_order) || '' : ''}" placeholder="0"></label>
+    <label class="field" id="maxWrap"><span>${t('cp_max_discount')} (${R.currency})</span><input name="max_discount" type="number" step="0.001" min="0.001" dir="ltr" value="${c?.max_discount ? Number(c.max_discount) : ''}" placeholder="${t('cp_no_limit')}"></label></div>
+    <div class="grid2"><label class="field"><span>${t('cp_starts')}</span><input name="starts_at" type="datetime-local" dir="ltr" value="${toLocalInput(c?.starts_at)}"></label>
+    <label class="field"><span>${t('cp_ends')}</span><input name="ends_at" type="datetime-local" dir="ltr" value="${toLocalInput(c?.ends_at)}"></label></div>
+    <div class="grid2"><label class="field"><span>${t('cp_max_uses')}</span><input name="max_uses" type="number" min="1" step="1" dir="ltr" value="${c?.max_uses || ''}" placeholder="${t('cp_no_limit')}"></label>
+    <label class="field"><span>${t('cp_per_phone')}</span><input name="per_phone_limit" type="number" min="1" step="1" dir="ltr" value="${c?.per_phone_limit || ''}" placeholder="${t('cp_no_limit')}"></label></div>
+    <label class="check"><input type="checkbox" name="is_active" ${!c || c.is_active ? 'checked' : ''}> ${t('cp_active')}</label>
+    <div class="row"><button class="btn primary" type="submit" id="scp">${t('save')}</button><button class="btn" type="button" onclick="closeModal()">${t('cancel')}</button>
+    <div class="grow"></div>${c ? `<button class="btn danger" type="button" id="dcp">${t('delete')}</button>` : ''}</div></form>`);
+  const f = $('fcp');
+  const sync = () => { $('maxWrap').style.visibility = f.kind.value === 'percent' ? 'visible' : 'hidden'; f.value.max = f.kind.value === 'percent' ? '100' : ''; };
+  f.kind.onchange = sync; sync();
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const num = v => v === '' || v == null ? null : Number(v);
+    const v = { code: f.code.value.trim().toUpperCase(), kind: f.kind.value, value: num(f.value.value), min_order: num(f.min_order.value) || 0,
+      max_discount: f.kind.value === 'percent' ? num(f.max_discount.value) : null,
+      starts_at: f.starts_at.value ? new Date(f.starts_at.value).toISOString() : null, ends_at: f.ends_at.value ? new Date(f.ends_at.value).toISOString() : null,
+      max_uses: num(f.max_uses.value), per_phone_limit: num(f.per_phone_limit.value), is_active: f.is_active.checked };
+    if (!/^[A-Z0-9_-]{3,20}$/.test(v.code)) { App.toast(t('cp_code_rule'), 'bad'); return; }
+    if (v.kind === 'percent' && v.value > 100) { App.toast(t('cp_pct_rule'), 'bad'); return; }
+    if (v.starts_at && v.ends_at && v.ends_at <= v.starts_at) { App.toast(t('cp_dates_rule'), 'bad'); return; }
+    $('scp').disabled = true;
+    const q = c ? sb.from('coupons').update(v).eq('id', c.id) : sb.from('coupons').insert({ ...v, restaurant_id: R.id });
+    const { error } = await q;
+    if (error) { $('scp').disabled = false; App.toast(/duplicate|coupons_rest_code/.test(error.message) ? t('cp_dup') : App.errMsg(error), 'bad'); return; }
+    closeModal(); App.toast(t('saved'), 'ok'); paneCoupons();
+  };
+  if (c) $('dcp').onclick = async () => { if (!confirm(t('confirm_delete'))) return; const { error } = await sb.from('coupons').delete().eq('id', c.id); if (error) return App.toast(App.errMsg(error), 'bad'); closeModal(); paneCoupons(); };
+}
+
+// ---------- modal ----------
+function openModal(html) { $('modal').innerHTML = html; $('modalBg').classList.remove('hidden'); }
+function closeModal() { $('modalBg').classList.add('hidden'); }
+$('modalBg').onclick = e => { if (e.target === $('modalBg')) closeModal(); };
+
+async function uploadImage(file, prefix) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `${R.id}/${prefix}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('menu-images').upload(path, file, { upsert: true, contentType: file.type });
+  if (error) throw error;
+  return sb.storage.from('menu-images').getPublicUrl(path).data.publicUrl;
+}
+
+// ---------- menu ----------
+async function paneMenu() {
+  $('pane').innerHTML = '<div class="spinner"></div>';
+  const [c, m] = await Promise.all([
+    sb.from('categories').select('*').eq('restaurant_id', R.id).order('sort_order').order('created_at'),
+    sb.from('menu_items').select('*').eq('restaurant_id', R.id).order('sort_order').order('created_at')
+  ]);
+  cats = c.data || []; items = m.data || [];
+  const catName = id => { const x = cats.find(c => c.id === id); return x ? App.L(x, 'name') : t('no_category'); };
+  $('pane').innerHTML = `<div class="menu-grid">
+    <div class="card"><div class="row spread"><h3 style="margin:0">${t('categories')}</h3><button class="btn sm" id="addCat">+ ${t('add')}</button></div>
+      ${cats.map(c => `<div class="cat-row"><span class="grow">${esc(App.L(c, 'name'))} <span class="small muted">(${items.filter(i => i.category_id === c.id).length})</span></span>
+        <button class="btn ghost sm" data-ecat="${c.id}">${t('edit')}</button></div>`).join('') || `<p class="muted small">—</p>`}
+    </div>
+    <div class="card"><div class="row spread"><h3 style="margin:0">${t('items')}</h3><button class="btn sm primary" id="addItem">+ ${t('new_item')}</button></div>
+      ${items.map(i => `<div class="it-row">${i.image_url ? `<img src="${esc(i.image_url)}" alt="">` : '<div class="ph"></div>'}
+        <div class="nm"><b>${esc(App.L(i, 'name'))}</b><span class="small muted">${esc(catName(i.category_id))} · ⏱ ${i.prep_minutes} ${t('min_short')}${(i.options || []).length ? ' · ⚙ ' + i.options.length : ''}</span></div>
+        <b class="num">${App.money(i.price, R.currency)}</b>
+        <label class="switch" title="${t('available')}"><input type="checkbox" data-avail="${i.id}" ${i.is_available ? 'checked' : ''}><span></span></label>
+        <button class="btn ghost sm" data-eitem="${i.id}">${t('edit')}</button></div>`).join('') || `<div class="empty">—</div>`}
+    </div></div>`;
+  $('addCat').onclick = () => catModal();
+  $('addItem').onclick = () => itemModal();
+  document.querySelectorAll('[data-ecat]').forEach(b => b.onclick = () => catModal(cats.find(c => c.id === b.dataset.ecat)));
+  document.querySelectorAll('[data-eitem]').forEach(b => b.onclick = () => itemModal(items.find(i => i.id === b.dataset.eitem)));
+  document.querySelectorAll('[data-avail]').forEach(cb => cb.onchange = async () => {
+    const { error } = await sb.from('menu_items').update({ is_available: cb.checked }).eq('id', cb.dataset.avail);
+    if (error) { App.toast(App.errMsg(error), 'bad'); cb.checked = !cb.checked; }
+  });
+}
+
+function catModal(c) {
+  openModal(`<h2>${c ? t('edit') : t('new_category')}</h2><form id="fc" class="stack">
+    <label class="field"><span>${t('name_ar')}</span><input name="name_ar" required value="${esc(c?.name_ar || '')}"></label>
+    <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr" value="${esc(c?.name_en || '')}"></label>
+    <label class="field"><span>#</span><input name="sort_order" type="number" value="${c?.sort_order ?? cats.length}"></label>
+    <div class="row"><button class="btn primary" type="submit">${t('save')}</button><button class="btn" type="button" onclick="closeModal()">${t('cancel')}</button>
+    <div class="grow"></div>${c ? `<button class="btn danger" type="button" id="dc">${t('delete')}</button>` : ''}</div></form>`);
+  $('fc').onsubmit = async e => {
+    e.preventDefault(); const v = Object.fromEntries(new FormData(e.target).entries()); v.sort_order = +v.sort_order || 0;
+    const q = c ? sb.from('categories').update(v).eq('id', c.id) : sb.from('categories').insert({ ...v, restaurant_id: R.id });
+    const { error } = await q; if (error) return App.toast(App.errMsg(error), 'bad');
+    closeModal(); paneMenu();
+  };
+  if (c) $('dc').onclick = async () => { if (!confirm(t('confirm_delete'))) return; await sb.from('categories').delete().eq('id', c.id); closeModal(); paneMenu(); };
+}
+
+function itemModal(i) {
+  openModal(`<h2>${i ? t('edit') : t('new_item')}</h2><form id="fi" class="stack">
+    <div class="grid2"><label class="field"><span>${t('name_ar')}</span><input name="name_ar" required value="${esc(i?.name_ar || '')}"></label>
+    <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr" value="${esc(i?.name_en || '')}"></label></div>
+    <label class="field"><span>${t('description_ar')}</span><textarea name="description_ar" rows="2">${esc(i?.description_ar || '')}</textarea></label>
+    <label class="field"><span>${t('description_en')}</span><textarea name="description_en" rows="2" dir="ltr">${esc(i?.description_en || '')}</textarea></label>
+    <div class="grid2"><label class="field"><span>${t('price')} (${R.currency})</span><input name="price" type="number" step="0.001" min="0" required value="${i?.price ?? ''}" dir="ltr"></label>
+    <label class="field"><span>${t('prep_minutes')}</span><input name="prep_minutes" type="number" min="0" max="180" required value="${i?.prep_minutes ?? 10}" dir="ltr"></label></div>
+    <label class="field"><span>${t('category')}</span><select name="category_id"><option value="">${t('no_category')}</option>
+      ${cats.map(c => `<option value="${c.id}" ${i?.category_id === c.id ? 'selected' : ''}>${esc(App.L(c, 'name'))}</option>`).join('')}</select></label>
+    <div class="card flat" style="background:#FBF7F2"><div class="row spread"><b>${t('options')}</b><button class="btn sm" type="button" id="addGroup">+ ${t('add_group')}</button></div>
+      <div class="small muted">${t('options_hint')}</div><div id="optEditor"></div></div>
+    <label class="field"><span>${t('image')}</span><input type="file" name="img" accept="image/*"></label>
+    ${i?.image_url ? `<img src="${esc(i.image_url)}" style="width:90px;height:90px;object-fit:cover;border-radius:10px">` : ''}
+    <label class="check"><input type="checkbox" name="is_available" ${i ? (i.is_available ? 'checked' : '') : 'checked'}> ${t('available')}</label>
+    <div class="row"><button class="btn primary" type="submit" id="si">${t('save')}</button><button class="btn" type="button" onclick="closeModal()">${t('cancel')}</button>
+    <div class="grow"></div>${i ? `<button class="btn danger" type="button" id="di">${t('delete')}</button>` : ''}</div></form>`);
+  let opts = JSON.parse(JSON.stringify(i?.options || []));
+  const rid = () => Math.random().toString(36).slice(2, 8);
+  const readOpts = () => {
+    document.querySelectorAll('#optEditor .og').forEach((el, gi) => {
+      const g = opts[gi]; if (!g) return;
+      g.name_ar = el.querySelector('[data-f=gar]').value.trim(); g.name_en = el.querySelector('[data-f=gen]').value.trim();
+      g.type = el.querySelector('[data-f=type]').value; g.required = el.querySelector('[data-f=req]').checked;
+      el.querySelectorAll('.oc').forEach((ce, ci) => { const c = g.choices[ci]; if (!c) return;
+        c.name_ar = ce.querySelector('[data-f=car]').value.trim(); c.name_en = ce.querySelector('[data-f=cen]').value.trim();
+        c.price = Math.max(0, +ce.querySelector('[data-f=cp]').value || 0); });
+    });
+  };
+  const drawOpts = () => {
+    $('optEditor').innerHTML = opts.map((g, gi) => `<div class="og">
+      <div class="grid2"><input data-f="gar" placeholder="${t('group_name_ar')}" value="${esc(g.name_ar || '')}"><input data-f="gen" dir="ltr" placeholder="${t('group_name_en')}" value="${esc(g.name_en || '')}"></div>
+      <div class="row wrap" style="margin-top:8px"><select data-f="type" style="width:auto"><option value="single" ${g.type !== 'multi' ? 'selected' : ''}>${t('single')}</option><option value="multi" ${g.type === 'multi' ? 'selected' : ''}>${t('multi')}</option></select>
+        <label class="check"><input type="checkbox" data-f="req" ${g.required ? 'checked' : ''}> ${t('required')}</label><div class="grow"></div>
+        <button class="btn ghost sm danger" type="button" data-rmg="${gi}">${t('remove')}</button></div>
+      ${(g.choices || []).map((c, ci) => `<div class="oc row" style="margin-top:6px;gap:6px"><input data-f="car" placeholder="${t('choice_ar')}" value="${esc(c.name_ar || '')}">
+        <input data-f="cen" dir="ltr" placeholder="${t('choice_en')}" value="${esc(c.name_en || '')}"><input data-f="cp" type="number" step="0.001" min="0" dir="ltr" style="max-width:110px" placeholder="${t('extra_price')}" value="${c.price || ''}">
+        <button class="btn ghost sm danger" type="button" data-rmc="${gi}:${ci}">✕</button></div>`).join('')}
+      <button class="btn sm" type="button" data-addc="${gi}" style="margin-top:8px">+ ${t('add_choice')}</button></div>`).join('');
+    document.querySelectorAll('[data-rmg]').forEach(b => b.onclick = () => { readOpts(); opts.splice(+b.dataset.rmg, 1); drawOpts(); });
+    document.querySelectorAll('[data-rmc]').forEach(b => b.onclick = () => { readOpts(); const [g, c] = b.dataset.rmc.split(':').map(Number); opts[g].choices.splice(c, 1); drawOpts(); });
+    document.querySelectorAll('[data-addc]').forEach(b => b.onclick = () => { readOpts(); opts[+b.dataset.addc].choices.push({ id: rid(), name_ar: '', name_en: '', price: 0 }); drawOpts(); });
+  };
+  $('addGroup').onclick = () => { readOpts(); opts.push({ id: rid(), name_ar: '', name_en: '', type: 'single', required: false, choices: [{ id: rid(), name_ar: '', name_en: '', price: 0 }] }); drawOpts(); };
+  drawOpts();
+  $('fi').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; $('si').disabled = true;
+    readOpts();
+    const cleanOpts = opts.map(g => ({ ...g, name_ar: g.name_ar || g.name_en, name_en: g.name_en || g.name_ar,
+      choices: (g.choices || []).filter(c => c.name_ar || c.name_en).map(c => ({ ...c, name_ar: c.name_ar || c.name_en, name_en: c.name_en || c.name_ar })) }))
+      .filter(g => (g.name_ar || g.name_en) && g.choices.length);
+    try {
+      const v = { name_ar: f.name_ar.value, name_en: f.name_en.value, description_ar: f.description_ar.value || null, description_en: f.description_en.value || null,
+        price: +f.price.value, prep_minutes: +f.prep_minutes.value, category_id: f.category_id.value || null, is_available: f.is_available.checked, options: cleanOpts };
+      if (f.img.files[0]) v.image_url = await uploadImage(f.img.files[0], 'item');
+      const q = i ? sb.from('menu_items').update(v).eq('id', i.id) : sb.from('menu_items').insert({ ...v, restaurant_id: R.id, sort_order: items.length });
+      const { error } = await q; if (error) throw error;
+      closeModal(); paneMenu();
+    } catch (err) { App.toast(App.errMsg(err), 'bad'); $('si').disabled = false; }
+  };
+  if (i) $('di').onclick = async () => { if (!confirm(t('confirm_delete'))) return; await sb.from('menu_items').delete().eq('id', i.id); closeModal(); paneMenu(); };
+}
+
+// ---------- QR ----------
+function paneQR() {
+  const url = App.menuUrl(R.slug);
+  $('pane').innerHTML = `<div class="card qr-wrap">
+    <div id="qrBox"><div id="qr"></div><div style="margin-top:10px;font-weight:700">${esc(R.name_ar)} · ${esc(R.name_en)}</div><div class="small muted">${t('tagline')}</div></div>
+    <div class="stack"><h2>${t('qr_title')}</h2><p class="muted">${t('qr_hint')}</p>
+      <input value="${url}" readonly dir="ltr" onclick="this.select()">
+      <div class="row wrap"><button class="btn primary" id="dl">⬇ ${t('download_png')}</button><button class="btn" id="pr">🖨 ${t('print')}</button>
+      <a class="btn" href="${url}" target="_blank">${t('open_menu')} ↗</a></div></div></div>`;
+  new QRCode($('qr'), { text: url, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+  $('dl').onclick = () => {
+    const src = $('qr').querySelector('canvas');
+    const c = document.createElement('canvas'), pad = 40; c.width = 240 + pad * 2; c.height = 240 + pad * 2 + 50;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, pad, pad);
+    x.fillStyle = '#1C1A17'; x.font = 'bold 20px sans-serif'; x.textAlign = 'center'; x.fillText(R.name_en, c.width / 2, 240 + pad + 34);
+    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `qr-${R.slug}.png`; a.click();
+  };
+  $('pr').onclick = () => {
+    const img = $('qr').querySelector('canvas').toDataURL();
+    $('printArea').innerHTML = `<div><h1 style="font-size:40px">${esc(R.name_ar)}<br>${esc(R.name_en)}</h1><img src="${img}" style="width:420px;margin:20px auto"><h2>📱 ${t('tagline')} · Scan to order</h2></div>`;
+    $('printArea').classList.remove('hidden'); setTimeout(() => { window.print(); $('printArea').classList.add('hidden'); }, 100);
+  };
+}
+
+// ---------- orders ----------
+const stBadge = { awaiting_payment: '', pending: 'brand', preparing: 'warn', ready: 'ok', completed: 'info', cancelled: 'bad' };
+let ordersChannel = null, ordersTimer = null, seenOrders = null;
+function stopOrdersLive() { if (ordersChannel) { sb.removeChannel(ordersChannel); ordersChannel = null; } }
+function startOrdersLive() {
+  ordersChannel = sb.channel('dash-orders-' + R.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: 'restaurant_id=eq.' + R.id }, () => {
+      clearTimeout(ordersTimer); ordersTimer = setTimeout(() => { if (tab === 'orders') paneOrders(true); }, 300);
+    })
+    .subscribe(st => { const b = $('liveBadge'); if (b) { b.className = 'badge ' + (st === 'SUBSCRIBED' ? 'ok' : 'warn'); b.textContent = st === 'SUBSCRIBED' ? '● LIVE' : '● …'; } });
+}
+async function paneOrders(silent) {
+  if (!silent) $('pane').innerHTML = '<div class="spinner"></div>';
+  if (!ordersChannel) startOrdersLive();
+  const { data } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options)').eq('restaurant_id', R.id).neq('status', 'awaiting_payment').order('created_at', { ascending: false }).limit(150);
+  if (tab !== 'orders') return;
+  const list = data || [];
+  const freshIds = seenOrders ? list.filter(o => !seenOrders.has(o.id)).map(o => o.id) : [];
+  seenOrders = new Set(list.map(o => o.id));
+  if (freshIds.length) { App.toast(t('new_order_toast'), 'ok'); if (document.hidden) { const o = list.find(x => x.id === freshIds[0]); PWA.notify(t('notif_new_order') + ' #' + o.order_number + ' · ' + App.L(R, 'name'), [o.car_make, o.car_color, o.car_plate].filter(Boolean).join(' · '), '/dashboard', 'order'); } }
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const today = list.filter(o => new Date(o.created_at) >= start && o.status !== 'cancelled');
+  const done = today.filter(o => o.ready_at);
+  const avg = done.length ? Math.round(done.reduce((s, o) => s + (new Date(o.ready_at) - new Date(o.created_at)), 0) / done.length / 60000) : null;
+  const live = ordersChannel && ordersChannel.state === 'joined';
+  $('pane').innerHTML = `<div style="text-align:end;margin-bottom:8px"><span id="liveBadge" class="badge ${live ? 'ok' : 'warn'}">${live ? '● LIVE' : '● …'}</span></div><div class="kpis">
+      <div class="card flat kpi"><span class="muted small">${t('today_orders')}</span><b class="num">${today.length}</b></div>
+      <div class="card flat kpi"><span class="muted small">${t('today_sales')}</span><b class="num">${App.money(today.reduce((s, o) => s + Number(o.total), 0), R.currency)}</b></div>
+      <div class="card flat kpi"><span class="muted small">${t('avg_time')}</span><b class="num">${avg == null ? '–' : avg + ' ' + t('min_short')}</b></div></div>
+    <div class="card" style="overflow-x:auto"><table><thead><tr><th>#</th><th>🕒</th><th>🚗</th><th>${t('items')}</th><th>${t('total')}</th><th></th></tr></thead><tbody>
+    ${list.map(o => `<tr class="${freshIds.includes(o.id) ? 'fresh' : ''}"><td><b>${o.order_number}</b></td><td class="small num">${new Date(o.created_at).toLocaleString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
+      <td class="small">${esc([o.car_make, o.car_color].filter(Boolean).join(' · '))} <span dir="ltr"><b>${esc(o.car_plate)}</b></span></td>
+      <td class="small">${o.order_items.map(i => i.qty + '× ' + esc(App.L(i, 'name')) + App.optsText(i.options)).join('، ')}</td>
+      <td class="num">${App.money(o.total, o.currency)}</td><td><span class="badge ${stBadge[o.status]}">${t(o.status === 'pending' ? 'col_new' : 'status_' + o.status)}</span>
+      ${o.payment_status === 'refund_pending' ? `<span class="badge warn">${t('refund_pending')}</span>` : o.payment_method === 'cash' ? `<span class="badge ${o.payment_status === 'paid' ? 'ok' : 'warn'}">💵 ${t(o.payment_status === 'paid' ? 'paid' : 'unpaid')}</span>` : `<span class="badge ok">💳</span>`}</td></tr>`).join('') || `<tr><td colspan="6" class="empty">${t('no_orders')}</td></tr>`}
+    </tbody></table></div>`;
+}
+async function paneStaff() {
+  $('pane').innerHTML = '<div class="spinner"></div>';
+  const { data, error } = await sb.rpc('list_members', { p_restaurant: R.id });
+  if (error) return App.toast(App.errMsg(error), 'bad');
+  $('pane').innerHTML = `<div class="card" style="max-width:720px"><p class="muted">${t('staff_hint')}</p>
+    <form id="fs" class="row wrap" style="margin-bottom:12px"><input name="email" type="email" required placeholder="${t('email')}" dir="ltr" style="flex:1;min-width:200px;width:auto">
+      <select name="role" style="width:auto"><option value="cashier">${t('cashier')}</option><option value="owner">${t('owner')}</option></select>
+      <button class="btn primary">${t('add_staff')}</button></form>
+    <table><tbody>${(data || []).map(m => `<tr><td dir="ltr" style="text-align:start">${esc(m.email)}</td><td><span class="badge ${m.role === 'owner' ? 'brand' : ''}">${t(m.role)}</span></td>
+      <td style="text-align:end">${m.user_id !== R.owner_id ? `<button class="btn ghost sm danger" data-rm="${m.user_id}">${t('delete')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  $('fs').onsubmit = async e => {
+    e.preventDefault(); const f = e.target;
+    const { error } = await sb.rpc('add_member', { p_restaurant: R.id, p_email: f.email.value, p_role: f.role.value });
+    if (error) return App.toast(App.errMsg(error), 'bad');
+    App.toast(t('saved'), 'ok'); paneStaff();
+  };
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    if (!confirm(t('confirm_delete'))) return;
+    const { error } = await sb.rpc('remove_member', { p_restaurant: R.id, p_user: b.dataset.rm });
+    if (error) return App.toast(App.errMsg(error), 'bad'); paneStaff();
+  });
+}
+
+// ---------- settings ----------
+function paneSettings() {
+  $('pane').innerHTML = `<div class="card" style="max-width:720px"><form id="fset" class="stack">
+    <div class="check" style="font-size:1.05rem"><label class="switch"><input type="checkbox" name="is_open" ${R.is_open ? 'checked' : ''}><span></span></label> ${t('is_open')}</div>
+    <div class="grid2"><label class="field"><span>${t('name_ar')}</span><input name="name_ar" required value="${esc(R.name_ar)}"></label>
+    <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr" value="${esc(R.name_en)}"></label></div>
+    <div class="grid2"><label class="field"><span>${t('slug')}</span><input name="slug" required dir="ltr" pattern="[a-z0-9][a-z0-9\-]{2,39}" value="${esc(R.slug)}"></label>
+    <label class="field"><span>${t('phone')}</span><input name="phone" dir="ltr" value="${esc(R.phone || '')}"></label></div>
+    <div class="card flat" style="background:#FBF7F2"><b>${t('payment_methods')}</b>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="accept_card" ${R.accept_card ? 'checked' : ''}> 💳 ${t('accept_card')}</label>
+      <label class="check" style="margin-top:8px"><input type="checkbox" name="accept_cash" ${R.accept_cash ? 'checked' : ''}> 💵 ${t('accept_cash')}</label></div>
+    <div class="card flat" style="background:#FBF7F2"><b>⏰ ${t('preorder_title')}</b>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="preorder_enabled" ${R.preorder_enabled !== false ? 'checked' : ''}> ${t('preorder_enable')}</label>
+      <label class="field" style="margin-top:10px"><span>${t('preorder_max')}</span><select name="preorder_max_hours" style="max-width:260px">${[2, 4, 8, 12, 24, 48, 72, 168].map(h => `<option value="${h}" ${Number(R.preorder_max_hours || 24) === h ? 'selected' : ''}>${h < 24 ? h + ' ' + t('hours_word') : (h / 24) + ' ' + t('days_word')}</option>`).join('')}</select></label></div>
+    <div class="grid2"><label class="field"><span>${t('base_prep')}</span><input name="base_prep_minutes" type="number" min="1" max="180" value="${R.base_prep_minutes}" dir="ltr"></label>
+    <label class="field"><span>${t('load_minutes')}</span><input name="per_order_load_minutes" type="number" min="0" max="30" value="${R.per_order_load_minutes}" dir="ltr"></label></div>
+    <div class="grid2"><label class="field"><span>${t('currency')}</span><select name="currency">${['OMR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'JOD', 'USD'].map(c => `<option ${c === R.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+    <label class="field"><span>${t('payment_mode')}</span><select name="payment_mode" disabled><option value="test">${t('mode_test')}</option><option value="live">${t('mode_live')}</option></select></label></div>
+    <label class="field"><span>${t('logo')}</span><input type="file" name="logo" accept="image/*"></label>
+    ${R.logo_url ? `<img src="${esc(R.logo_url)}" style="width:72px;height:72px;border-radius:16px;object-fit:cover">` : ''}
+    <div><button class="btn primary lg" id="sset">${t('save')}</button></div></form></div>`;
+  $('fset').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; $('sset').disabled = true;
+    try {
+      const v = { is_open: f.is_open.checked, name_ar: f.name_ar.value, name_en: f.name_en.value, slug: slugify(f.slug.value), phone: f.phone.value || null,
+        base_prep_minutes: +f.base_prep_minutes.value, per_order_load_minutes: +f.per_order_load_minutes.value, currency: f.currency.value,
+        accept_card: f.accept_card.checked, accept_cash: f.accept_cash.checked,
+        preorder_enabled: f.preorder_enabled.checked, preorder_max_hours: +f.preorder_max_hours.value };
+      if (!v.accept_card && !v.accept_cash) throw new Error(t('need_one_method'));
+      if (f.logo.files[0]) v.logo_url = await uploadImage(f.logo.files[0], 'logo');
+      const { error } = await sb.from('restaurants').update(v).eq('id', R.id); if (error) throw error;
+      App.toast(t('saved'), 'ok'); await loadMems(R.id);
+    } catch (err) { App.toast(err.message === t('need_one_method') ? err.message : App.errMsg(err), 'bad'); $('sset').disabled = false; }
+  };
+}
+
+document.addEventListener('langchange', () => { if (R) loadMems(R.id); else renderCreate(); });
+init();
+</script>
+</body>
+</html>

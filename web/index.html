@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriveMenu · درايف منيو</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .hero { padding: 64px 0 40px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center; }
+  .hero h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.01em; }
+  .hero p { font-size: 1.15rem; color: var(--muted); max-width: 34em; }
+  .feats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 20px 0 60px; }
+  .feat .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 20px; margin-bottom: 10px; }
+  .feat h3 { font-size: 1.02rem; margin-bottom: 4px; }
+  .feat p { margin: 0; color: var(--muted); font-size: .92rem; }
+  .phone { background: var(--ink); border-radius: 34px; padding: 12px; max-width: 290px; margin-inline: auto; box-shadow: 0 30px 60px rgba(28,26,23,.25); }
+  .phone .scr { background: var(--bg); border-radius: 24px; padding: 16px; min-height: 420px; }
+  .mock-item { display: flex; justify-content: space-between; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: .9rem; }
+  .mock-eta { background: var(--brand); color: #fff; border-radius: 14px; padding: 14px; text-align: center; margin-top: 14px; }
+  .mock-eta b { display: block; font-size: 1.8rem; }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; padding-top: 36px; } .feats { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .feats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="container inner">
+  <a class="logo" href="/"><span class="logo-mark">🚗</span><span data-i18n="brand"></span></a>
+  <div class="grow"></div>
+  <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+  <button class="btn sm" id="btnTop" data-i18n="login"></button>
+</div></header>
+
+<main class="container">
+  <section class="hero">
+    <div>
+      <span class="badge brand" data-i18n="for_restaurants"></span>
+      <h1 style="margin-top:14px" data-i18n="hero_title"></h1>
+      <p data-i18n="hero_sub"></p>
+      <div class="row wrap" style="margin-top:22px">
+        <button class="btn primary lg" id="btnHeroSignup" data-i18n="signup"></button>
+        <button class="btn lg" id="btnHeroLogin" data-i18n="login"></button>
+      </div>
+    </div>
+    <div class="phone" aria-hidden="true"><div class="scr">
+      <div class="row spread" style="margin-bottom:12px"><b>🍔 Burger House</b><span class="badge ok">●</span></div>
+      <div class="mock-item"><span>Classic Burger ×2</span><b>3.400</b></div>
+      <div class="mock-item"><span>Fries ×1</span><b>0.800</b></div>
+      <div class="mock-item"><span>🚙 Toyota · ⚪ · 12345</span></div>
+      <div class="mock-eta"><span data-i18n="ready_in"></span><b>12</b><span data-i18n="minutes"></span></div>
+    </div></div>
+  </section>
+
+  <section class="feats">
+    <div class="card flat feat"><div class="ic">▦</div><h3 data-i18n="feat_qr"></h3><p data-i18n="feat_qr_d"></p></div>
+    <div class="card flat feat"><div class="ic">💳</div><h3 data-i18n="feat_pay"></h3><p data-i18n="feat_pay_d"></p></div>
+    <div class="card flat feat"><div class="ic">⏱</div><h3 data-i18n="feat_time"></h3><p data-i18n="feat_time_d"></p></div>
+    <div class="card flat feat"><div class="ic">🚗</div><h3 data-i18n="feat_car"></h3><p data-i18n="feat_car_d"></p></div>
+  </section>
+</main>
+<footer class="container small muted" style="padding:24px 20px 40px;display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line)">
+  <span>© DriveMenu</span><a href="/privacy" data-i18n="privacy"></a><a href="/terms" data-i18n="terms"></a>
+</footer>
+
+<div class="modal-bg hidden" id="authModal">
+  <div class="modal" style="max-width:420px">
+    <div class="row spread"><h2 id="authTitle" style="margin:0"></h2><button class="btn ghost sm" id="authClose">✕</button></div>
+    <form id="authForm" class="stack" style="margin-top:16px">
+      <label class="field"><span data-i18n="email"></span><input type="email" id="authEmail" required autocomplete="email" dir="ltr"></label>
+      <label class="field"><span data-i18n="password"></span><input type="password" id="authPass" required minlength="6" autocomplete="current-password" dir="ltr"></label>
+      <button class="btn primary block lg" id="authSubmit" type="submit"></button>
+      <p class="small muted" style="text-align:center"><span id="authSwitchText"></span> <a href="#" id="authSwitch"></a></p>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/common.js"></script>
+<script>
+  let mode = 'login';
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next') || '/dashboard';
+  const $ = id => document.getElementById(id);
+
+  function renderAuth() {
+    $('authTitle').textContent = App.t(mode);
+    $('authSubmit').textContent = App.t(mode);
+    $('authSwitchText').textContent = App.t(mode === 'login' ? 'no_account' : 'have_account');
+    $('authSwitch').textContent = App.t(mode === 'login' ? 'signup' : 'login');
+    $('authPass').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  }
+  function openAuth(m) { mode = m; renderAuth(); $('authModal').classList.remove('hidden'); $('authEmail').focus(); }
+  $('authClose').onclick = () => $('authModal').classList.add('hidden');
+  $('authSwitch').onclick = e => { e.preventDefault(); mode = mode === 'login' ? 'signup' : 'login'; renderAuth(); };
+  $('btnHeroSignup').onclick = () => openAuth('signup');
+  $('btnHeroLogin').onclick = () => openAuth('login');
+  document.addEventListener('langchange', renderAuth);
+
+  $('authForm').onsubmit = async e => {
+    e.preventDefault();
+    const email = $('authEmail').value.trim(), password = $('authPass').value;
+    $('authSubmit').disabled = true;
+    try {
+      if (mode === 'signup') {
+        const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + '/dashboard' } });
+        if (error) throw error;
+        if (data.session) { location.href = next; return; }
+        App.toast(App.t('check_email'), 'ok'); mode = 'login'; renderAuth();
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        location.href = next;
+      }
+    } catch (err) { App.toast(App.errMsg(err), 'bad'); }
+    finally { $('authSubmit').disabled = false; }
+  };
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    if (data.session) {
+      $('btnTop').setAttribute('data-i18n', 'dashboard'); $('btnTop').textContent = App.t('dashboard');
+      $('btnTop').onclick = () => location.href = '/dashboard';
+    } else {
+      $('btnTop').onclick = () => openAuth('login');
+      if (params.get('login')) openAuth('login');
+    }
+  })();
+</script>
+</body>
+</html>

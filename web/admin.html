@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin · DriveMenu</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi b { display: block; font-size: 1.6rem; }
+  tr.off td { opacity: .55; }
+  td .sub { display: block; font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="container inner">
+  <a class="logo" href="/dashboard"><span class="logo-mark">🛡</span><span data-i18n="admin"></span></a>
+  <div class="grow"></div>
+  <a class="btn sm" href="/dashboard" data-i18n="dashboard"></a>
+  <button class="btn ghost sm" data-lang-toggle data-i18n="lang_toggle"></button>
+</div></header>
+<main class="container" style="padding-top:22px;padding-bottom:60px">
+  <div id="root"><div class="spinner"></div></div>
+  <div id="rpAdmin" style="margin-top:18px"></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/common.js"></script>
+<script src="/assets/reports.js"></script>
+<script>
+const $ = id => document.getElementById(id), t = k => App.t(k), esc = App.esc;
+let D = null, q = '';
+
+async function load() {
+  const s = await App.requireAuth(); if (!s) return;
+  const { data, error } = await sb.rpc('admin_overview');
+  if (error) { $('root').innerHTML = `<div class="empty">${t('not_admin')}</div>`; return; }
+  D = data; render();
+  Reports.renderAdmin($('rpAdmin'));
+}
+
+function fmtDate(iso) {
+  return iso ? new Date(iso).toLocaleString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' }) : t('never');
+}
+
+function render() {
+  const T = D.totals;
+  const list = D.restaurants.filter(r => !q || [r.name_ar, r.name_en, r.slug, r.owner_email].join(' ').toLowerCase().includes(q));
+  $('root').innerHTML = `
+    <div class="kpis">
+      <div class="card flat kpi"><span class="small muted">${t('restaurants')}</span><b class="num">${T.active_restaurants} / ${T.restaurants}</b></div>
+      <div class="card flat kpi"><span class="small muted">${t('users')}</span><b class="num">${T.users}</b></div>
+      <div class="card flat kpi"><span class="small muted">${t('orders_today')}</span><b class="num">${T.orders_today}</b></div>
+      <div class="card flat kpi"><span class="small muted">${t('orders_month')}</span><b class="num">${T.orders_month}</b></div>
+      <div class="card flat kpi"><span class="small muted">${t('sales_month')}</span><b class="num">${App.money(T.sales_month, 'OMR')}</b></div>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <div class="row spread" style="margin-bottom:10px"><h2 style="margin:0">${t('restaurants')}</h2>
+        <input id="q" placeholder="${t('search')}" value="${esc(q)}" style="max-width:260px"></div>
+      <table><thead><tr><th>${t('restaurants')}</th><th>${t('owner_email')}</th><th>${t('items')}</th><th>${t('orders_today')}</th><th>${t('orders_month')}</th><th>${t('sales_month')}</th><th>${t('last_order')}</th><th></th></tr></thead><tbody>
+      ${list.map(r => `<tr class="${r.is_suspended ? 'off' : ''}">
+        <td><b>${esc(App.L(r, 'name'))}</b><a class="sub" href="/r/${esc(r.slug)}" target="_blank" dir="ltr">/r/${esc(r.slug)}</a></td>
+        <td dir="ltr" style="text-align:start" class="small">${esc(r.owner_email || '')}${r.phone ? `<span class="sub">${esc(r.phone)}</span>` : ''}</td>
+        <td class="num">${r.items}</td><td class="num">${r.orders_today}</td><td class="num">${r.orders_month}</td>
+        <td class="num">${App.money(r.sales_month, r.currency)}</td>
+        <td class="small num">${fmtDate(r.last_order_at)}</td>
+        <td><span class="badge ${r.is_suspended ? 'bad' : r.is_open ? 'ok' : ''}">${r.is_suspended ? t('suspended') : r.is_open ? t('open_now') : t('closed_now')}</span>
+          <button class="btn sm ${r.is_suspended ? '' : 'danger'}" data-sus="${r.id}" data-v="${r.is_suspended ? 0 : 1}" style="margin-inline-start:6px">${r.is_suspended ? t('unsuspend') : t('suspend')}</button></td>
+      </tr>`).join('') || `<tr><td colspan="8" class="empty">—</td></tr>`}
+      </tbody></table></div>`;
+  $('q').oninput = e => { q = e.target.value.toLowerCase(); const pos = e.target.selectionStart; render(); $('q').focus(); $('q').setSelectionRange(pos, pos); };
+  document.querySelectorAll('[data-sus]').forEach(b => b.onclick = async () => {
+    const v = b.dataset.v === '1';
+    if (v && !confirm(t('confirm_suspend'))) return;
+    b.disabled = true;
+    const { error } = await sb.rpc('admin_set_suspended', { p_restaurant: b.dataset.sus, p_suspended: v });
+    if (error) { App.toast(App.errMsg(error), 'bad'); b.disabled = false; return; }
+    App.toast(t('saved'), 'ok'); load();
+  });
+}
+
+document.addEventListener('langchange', () => { if (D) { render(); Reports.renderAdmin($('rpAdmin')); } });
+load();
+</script>
+</body>
+</html>
