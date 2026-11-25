@@ -75,6 +75,8 @@
   .coupon-row input { text-transform: uppercase; }
   .coupon-on { display: flex; justify-content: space-between; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 12px; padding: 10px 12px; font-weight: 600; margin: 4px 0 6px; }
   .lastorder { background: var(--info-soft); color: var(--info); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-top: 8px; }
+  .mny { display: inline-flex; align-items: center; gap: .28em; white-space: nowrap; unicode-bidi: isolate; }
+  .rial { width: 1.05em; height: .85em; flex: none; margin-top: -.12em; }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
@@ -133,10 +135,15 @@ function cartLines() {
 }
 function cartTotal() { return cartLines().reduce((s, l) => s + l.unit * l.qty, 0); }
 function cartCount() { return cartLines().reduce((s, l) => s + l.qty, 0); }
-function money(v) {
+const RIAL_SVG = '<svg class="rial" viewBox="6 13.5 30 23" aria-hidden="true"><path d="M26.2 20.6C25.5 17 22.5 15.5 20.2 15.6C17 15.8 15.2 18.6 15.6 22C16 26.5 20 31 24 34.8M7 29.2H34.6M7 35H34.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+function moneyParts(v) {
   const cur = (R && R.currency) || 'OMR', d = ['OMR', 'KWD', 'BHD', 'JOD'].includes(cur) ? 3 : 2;
-  const sym = App.lang === 'ar' ? ({ OMR: 'ر.ع.', SAR: 'ر.س.', AED: 'د.إ.', KWD: 'د.ك.', BHD: 'د.ب.', QAR: 'ر.ق.', JOD: 'د.أ.' }[cur] || cur) : cur;
-  return `\u2068${sym}\u00a0${Number(v || 0).toFixed(d)}\u2069`;
+  return { cur, n: Number(v || 0).toFixed(d) };
+}
+function moneyText(v) { const { cur, n } = moneyParts(v); return `\u2066${cur === 'OMR' && App.lang === 'ar' ? 'ر.ع.' : cur} ${n}\u2069`; }
+function money(v) {
+  const { cur, n } = moneyParts(v);
+  return `<span class="mny" dir="ltr">${cur === 'OMR' ? RIAL_SVG : esc(cur) + ' '}<span>${n}</span></span>`;
 }
 function tz() { return (R && R.timezone) || 'Asia/Muscat'; }
 function couponDiscount(sub) {
@@ -241,7 +248,7 @@ $('btnShare').onclick = async () => {
 function renderBar() {
   const n = cartCount();
   $('cartbar').classList.toggle('hidden', !n || !R.is_open);
-  $('cartCount').textContent = n; $('cartTotal').textContent = money(cartTotal());
+  $('cartCount').textContent = n; $('cartTotal').innerHTML = money(cartTotal());
 }
 
 document.addEventListener('click', e => {
@@ -365,7 +372,7 @@ function renderSheet() {
       ${etaBox()}
       ${methodPicker}
       <p class="small" style="background:var(--ok-soft);color:var(--ok);padding:10px 12px;border-radius:10px">💵 ${t('pay_cash_note')}</p>
-      <button class="btn primary lg block" id="btnCash" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('processing') : t('confirm_order') + ' · ' + App.money(pending.total, pending.currency)}</button>`;
+      <button class="btn primary lg block" id="btnCash" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('processing') : t('confirm_order') + ' · ' + money(pending.total)}</button>`;
       if ($('shBack')) $('shBack').onclick = () => { step = 'cart'; renderSheet(); };
       document.querySelectorAll('input[name=pm]').forEach(r => r.onchange = () => { payMethod = r.value; renderSheet(); });
       $('btnCash').onclick = confirmCash;
@@ -377,7 +384,7 @@ function renderSheet() {
       ${methodPicker}
       <div class="cardbox">💳 VISA / Mastercard / OmanNet</div>
       <p class="small muted">${t('pay_secure_note')}</p>
-      <button class="btn primary lg block" id="btnPay" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('pay_redirecting') : t('pay_thawani') + ' · ' + App.money(pending.total, pending.currency)}</button>`;
+      <button class="btn primary lg block" id="btnPay" ${step === 'paying' ? 'disabled' : ''}>${step === 'paying' ? t('pay_redirecting') : t('pay_thawani') + ' · ' + money(pending.total)}</button>`;
     if ($('shBack')) $('shBack').onclick = () => { step = 'cart'; renderSheet(); };
     $('btnPay').onclick = pay;
     document.querySelectorAll('input[name=pm]').forEach(r => r.onchange = () => { payMethod = r.value; renderSheet(); });
@@ -414,13 +421,13 @@ function etaBox() {
   const sched = pending.scheduled_for ? `<span>⏰ ${t('pickup_at')}</span><span><b style="font-size:1.1rem">${esc(slotLabel(pending.scheduled_for))}</b></span>`
     : `<span>⏱ ${t('est_time')}</span><span><b class="num">${pending.estimated_minutes}</b> ${t('minutes')}</span>`;
   return `<div class="eta" style="margin:14px 0">${sched}</div>
-    ${Number(pending.discount) ? `<div class="line"><span>${t('subtotal')}</span><span class="num">${App.money(pending.subtotal, pending.currency)}</span></div><div class="line" style="color:var(--ok)"><span>${t('discount')}</span><span class="num">−${App.money(pending.discount, pending.currency)}</span></div>` : ''}
-    <div class="line" style="font-size:1.1rem;border:0;margin-bottom:8px"><b>${t('total')}</b><b class="num">${App.money(pending.total, pending.currency)}</b></div>`;
+    ${Number(pending.discount) ? `<div class="line"><span>${t('subtotal')}</span><span class="num">${money(pending.subtotal)}</span></div><div class="line" style="color:var(--ok)"><span>${t('discount')}</span><span class="num">−${money(pending.discount)}</span></div>` : ''}
+    <div class="line" style="font-size:1.1rem;border:0;margin-bottom:8px"><b>${t('total')}</b><b class="num">${money(pending.total)}</b></div>`;
 }
 function couponErr(error) {
   const m = (error && error.message) || '';
   const mm = m.match(/COUPON_MIN_ORDER:([\d.]+)/);
-  if (mm) return t('coupon_min').replace('{v}', money(mm[1]));
+  if (mm) return t('coupon_min').replace('{v}', moneyText(mm[1]));
   for (const k of ['COUPON_EXPIRED', 'COUPON_NOT_STARTED', 'COUPON_USED_UP', 'COUPON_PHONE_LIMIT', 'COUPON_INVALID']) if (m.includes(k)) return t(k.toLowerCase());
   return null;
 }
