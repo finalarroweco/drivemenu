@@ -8,6 +8,9 @@
 <meta name="theme-color" content="#E2552B">
 <link rel="stylesheet" href="/assets/app.css">
 <style>
+  .cat-row { cursor: pointer; border-radius: 10px; padding-inline: 8px !important; }
+  .cat-row:hover { background: #F7F3EE; }
+  .cat-row.on { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
   .cat-row, .it-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .it-row img, .it-row .ph { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: #F3EEE7; flex: none; }
   .it-row .nm { flex: 1; min-width: 0; }
@@ -245,6 +248,7 @@ async function uploadImage(file, prefix) {
 }
 
 // ---------- menu ----------
+let menuCat = null;
 async function paneMenu() {
   $('pane').innerHTML = '<div class="spinner"></div>';
   const [c, m] = await Promise.all([
@@ -253,26 +257,46 @@ async function paneMenu() {
   ]);
   cats = c.data || []; items = m.data || [];
   const catName = id => { const x = cats.find(c => c.id === id); return x ? App.L(x, 'name') : t('no_category'); };
+  if (menuCat && menuCat !== 'none' && !cats.find(c => c.id === menuCat)) menuCat = null;
+  const countOf = id => items.filter(i => id === 'none' ? !i.category_id || !cats.find(c => c.id === i.category_id) : i.category_id === id).length;
+  const loose = countOf('none');
+  const catBtn = (id, label, n) => `<div class="cat-row ${menuCat === id ? 'on' : ''}" data-fcat="${id ?? ''}"><span class="grow">${esc(label)} <span class="small muted">(${n})</span></span>
+        ${id && id !== 'none' ? `<button class="btn ghost sm" data-ecat="${id}">${t('edit')}</button>` : ''}</div>`;
   $('pane').innerHTML = `<div class="menu-grid">
     <div class="card"><div class="row spread"><h3 style="margin:0">${t('categories')}</h3><button class="btn sm" id="addCat">+ ${t('add')}</button></div>
-      ${cats.map(c => `<div class="cat-row"><span class="grow">${esc(App.L(c, 'name'))} <span class="small muted">(${items.filter(i => i.category_id === c.id).length})</span></span>
-        <button class="btn ghost sm" data-ecat="${c.id}">${t('edit')}</button></div>`).join('') || `<p class="muted small">—</p>`}
+      ${catBtn(null, App.lang === 'ar' ? 'كل الأصناف' : 'All items', items.length)}
+      ${cats.map(c => catBtn(c.id, App.L(c, 'name'), countOf(c.id))).join('')}
+      ${loose ? catBtn('none', t('no_category'), loose) : ''}
     </div>
-    <div class="card"><div class="row spread"><h3 style="margin:0">${t('items')}</h3><button class="btn sm primary" id="addItem">+ ${t('new_item')}</button></div>
-      ${items.map(i => `<div class="it-row">${i.image_url ? `<img src="${esc(i.image_url)}" alt="">` : '<div class="ph"></div>'}
-        <div class="nm"><b>${esc(App.L(i, 'name'))}</b><span class="small muted">${esc(catName(i.category_id))} · ⏱ ${i.prep_minutes} ${t('min_short')}${(i.options || []).length ? ' · ⚙ ' + i.options.length : ''}</span></div>
+    <div class="card"><div class="row spread"><h3 style="margin:0" id="itTitle"></h3><button class="btn sm primary" id="addItem">+ ${t('new_item')}</button></div>
+      <div id="itList"></div>
+    </div></div>`;
+  const drawItems = () => {
+    const list = menuCat === null ? items : items.filter(i => menuCat === 'none' ? !i.category_id || !cats.find(c => c.id === i.category_id) : i.category_id === menuCat);
+    const c = cats.find(c => c.id === menuCat);
+    $('itTitle').innerHTML = menuCat === null ? t('items') : `${esc(c ? App.L(c, 'name') : t('no_category'))} <span class="small muted" style="font-weight:400">(${list.length})</span>`;
+    $('itList').innerHTML = list.map(i => `<div class="it-row">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : '<div class="ph"></div>'}
+        <div class="nm"><b>${esc(App.L(i, 'name'))}</b><span class="small muted">${menuCat === null ? esc(catName(i.category_id)) + ' · ' : ''}⏱ ${i.prep_minutes} ${t('min_short')}${(i.options || []).length ? ' · ⚙ ' + i.options.length : ''}</span></div>
         <b class="num">${App.money(i.price, R.currency)}</b>
         <label class="switch" title="${t('available')}"><input type="checkbox" data-avail="${i.id}" ${i.is_available ? 'checked' : ''}><span></span></label>
-        <button class="btn ghost sm" data-eitem="${i.id}">${t('edit')}</button></div>`).join('') || `<div class="empty">—</div>`}
-    </div></div>`;
-  $('addCat').onclick = () => catModal();
-  $('addItem').onclick = () => itemModal();
-  document.querySelectorAll('[data-ecat]').forEach(b => b.onclick = () => catModal(cats.find(c => c.id === b.dataset.ecat)));
-  document.querySelectorAll('[data-eitem]').forEach(b => b.onclick = () => itemModal(items.find(i => i.id === b.dataset.eitem)));
-  document.querySelectorAll('[data-avail]').forEach(cb => cb.onchange = async () => {
-    const { error } = await sb.from('menu_items').update({ is_available: cb.checked }).eq('id', cb.dataset.avail);
-    if (error) { App.toast(App.errMsg(error), 'bad'); cb.checked = !cb.checked; }
+        <button class="btn ghost sm" data-eitem="${i.id}">${t('edit')}</button></div>`).join('') || `<div class="empty">—</div>`;
+    document.querySelectorAll('#itList [data-eitem]').forEach(b => b.onclick = () => itemModal(items.find(i => i.id === b.dataset.eitem)));
+    document.querySelectorAll('#itList [data-avail]').forEach(cb => cb.onchange = async () => {
+      const { error } = await sb.from('menu_items').update({ is_available: cb.checked }).eq('id', cb.dataset.avail);
+      if (error) { App.toast(App.errMsg(error), 'bad'); cb.checked = !cb.checked; } else { const it = items.find(i => i.id === cb.dataset.avail); if (it) it.is_available = cb.checked; }
+    });
+  };
+  drawItems();
+  document.querySelectorAll('[data-fcat]').forEach(r => r.onclick = e => {
+    if (e.target.closest('[data-ecat]')) return;
+    menuCat = r.dataset.fcat || null;
+    document.querySelectorAll('[data-fcat]').forEach(x => x.classList.toggle('on', x === r));
+    drawItems();
+    if (innerWidth < 860) $('itTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  $('addCat').onclick = () => catModal();
+  $('addItem').onclick = () => itemModal(null, menuCat && menuCat !== 'none' ? menuCat : null);
+  document.querySelectorAll('[data-ecat]').forEach(b => b.onclick = () => catModal(cats.find(c => c.id === b.dataset.ecat)));
 }
 
 function catModal(c) {
@@ -291,7 +315,7 @@ function catModal(c) {
   if (c) $('dc').onclick = async () => { if (!confirm(t('confirm_delete'))) return; await sb.from('categories').delete().eq('id', c.id); closeModal(); paneMenu(); };
 }
 
-function itemModal(i) {
+function itemModal(i, defCat) {
   openModal(`<h2>${i ? t('edit') : t('new_item')}</h2><form id="fi" class="stack">
     <div class="grid2"><label class="field"><span>${t('name_ar')}</span><input name="name_ar" required value="${esc(i?.name_ar || '')}"></label>
     <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr" value="${esc(i?.name_en || '')}"></label></div>
@@ -300,7 +324,7 @@ function itemModal(i) {
     <div class="grid2"><label class="field"><span>${t('price')} (${R.currency})</span><input name="price" type="number" step="0.001" min="0" required value="${i?.price ?? ''}" dir="ltr"></label>
     <label class="field"><span>${t('prep_minutes')}</span><input name="prep_minutes" type="number" min="0" max="180" required value="${i?.prep_minutes ?? 10}" dir="ltr"></label></div>
     <label class="field"><span>${t('category')}</span><select name="category_id"><option value="">${t('no_category')}</option>
-      ${cats.map(c => `<option value="${c.id}" ${i?.category_id === c.id ? 'selected' : ''}>${esc(App.L(c, 'name'))}</option>`).join('')}</select></label>
+      ${cats.map(c => `<option value="${c.id}" ${(i ? i.category_id : defCat) === c.id ? 'selected' : ''}>${esc(App.L(c, 'name'))}</option>`).join('')}</select></label>
     <div class="card flat" style="background:#FBF7F2"><div class="row spread"><b>${t('options')}</b><button class="btn sm" type="button" id="addGroup">+ ${t('add_group')}</button></div>
       <div class="small muted">${t('options_hint')}</div><div id="optEditor"></div></div>
     <label class="field"><span>${t('image')}</span><input type="file" name="img" accept="image/*"></label>
