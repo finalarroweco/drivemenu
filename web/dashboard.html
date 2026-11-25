@@ -10,6 +10,12 @@
 <style>
   .cat-row { cursor: pointer; border-radius: 10px; padding-inline: 8px !important; }
   .cat-row:hover { background: #F7F3EE; }
+  .cat-row .ord { display: inline-flex; flex-direction: column; gap: 2px; }
+  .cat-row .ob { border: 1px solid var(--line); background: #fff; border-radius: 6px; width: 28px; height: 18px; font-size: 9px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0; }
+  .cat-row .ob:hover { color: var(--brand); border-color: var(--brand); }
+  .cat-row[draggable] { cursor: grab; }
+  .cat-row.drag { opacity: .4; }
+  .cat-row.over { box-shadow: inset 0 2px 0 var(--brand); }
   .cat-row.on { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
   .cat-row, .it-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .it-row img, .it-row .ph { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: #F3EEE7; flex: none; }
@@ -260,8 +266,8 @@ async function paneMenu() {
   if (menuCat && menuCat !== 'none' && !cats.find(c => c.id === menuCat)) menuCat = null;
   const countOf = id => items.filter(i => id === 'none' ? !i.category_id || !cats.find(c => c.id === i.category_id) : i.category_id === id).length;
   const loose = countOf('none');
-  const catBtn = (id, label, n) => `<div class="cat-row ${menuCat === id ? 'on' : ''}" data-fcat="${id ?? ''}"><span class="grow">${esc(label)} <span class="small muted">(${n})</span></span>
-        ${id && id !== 'none' ? `<button class="btn ghost sm" data-ecat="${id}">${t('edit')}</button>` : ''}</div>`;
+  const catBtn = (id, label, n) => `<div class="cat-row ${menuCat === id ? 'on' : ''}" data-fcat="${id ?? ''}" ${id && id !== 'none' ? 'draggable="true"' : ''}><span class="grow">${esc(label)} <span class="small muted">(${n})</span></span>
+        ${id && id !== 'none' ? `<span class="ord"><button class="ob" data-up="${id}" title="↑" aria-label="up">▲</button><button class="ob" data-down="${id}" title="↓" aria-label="down">▼</button></span><button class="btn ghost sm" data-ecat="${id}">${t('edit')}</button>` : ''}</div>`;
   $('pane').innerHTML = `<div class="menu-grid">
     <div class="card"><div class="row spread"><h3 style="margin:0">${t('categories')}</h3><button class="btn sm" id="addCat">+ ${t('add')}</button></div>
       ${catBtn(null, App.lang === 'ar' ? 'كل الأصناف' : 'All items', items.length)}
@@ -288,11 +294,31 @@ async function paneMenu() {
   };
   drawItems();
   document.querySelectorAll('[data-fcat]').forEach(r => r.onclick = e => {
-    if (e.target.closest('[data-ecat]')) return;
+    if (e.target.closest('[data-ecat],.ord')) return;
     menuCat = r.dataset.fcat || null;
     document.querySelectorAll('[data-fcat]').forEach(x => x.classList.toggle('on', x === r));
     drawItems();
     if (innerWidth < 860) $('itTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  const saveOrder = async ids => {
+    ids.forEach((id, k) => { const c = cats.find(c => c.id === id); if (c) c.sort_order = k; });
+    const res = await Promise.all(ids.map((id, k) => sb.from('categories').update({ sort_order: k }).eq('id', id).eq('restaurant_id', R.id)));
+    const bad = res.find(r => r.error); if (bad) App.toast(App.errMsg(bad.error), 'bad'); else App.toast(App.lang === 'ar' ? 'تم حفظ الترتيب' : 'Order saved', 'ok');
+    cats.sort((a, b) => a.sort_order - b.sort_order); paneMenu();
+  };
+  const orderIds = () => cats.map(c => c.id);
+  document.querySelectorAll('[data-up],[data-down]').forEach(b => b.onclick = e => {
+    e.stopPropagation(); const ids = orderIds(), id = b.dataset.up || b.dataset.down, k = ids.indexOf(id), j = b.dataset.up ? k - 1 : k + 1;
+    if (j < 0 || j >= ids.length) return; [ids[k], ids[j]] = [ids[j], ids[k]]; saveOrder(ids);
+  });
+  let dragId = null;
+  document.querySelectorAll('.cat-row[draggable]').forEach(r => {
+    r.addEventListener('dragstart', e => { dragId = r.dataset.fcat; r.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; });
+    r.addEventListener('dragend', () => { r.classList.remove('drag'); document.querySelectorAll('.cat-row').forEach(x => x.classList.remove('over')); });
+    r.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); r.classList.add('over'); });
+    r.addEventListener('dragleave', () => r.classList.remove('over'));
+    r.addEventListener('drop', e => { e.preventDefault(); const to = r.dataset.fcat; if (!dragId || dragId === to) return;
+      const ids = orderIds().filter(x => x !== dragId); ids.splice(ids.indexOf(to), 0, dragId); dragId = null; saveOrder(ids); });
   });
   $('addCat').onclick = () => catModal();
   $('addItem').onclick = () => itemModal(null, menuCat && menuCat !== 'none' ? menuCat : null);
