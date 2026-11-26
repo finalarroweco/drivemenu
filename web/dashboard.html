@@ -355,6 +355,7 @@ function itemModal(i, defCat) {
       <div class="small muted">${t('options_hint')}</div><div id="optEditor"></div></div>
     <label class="field"><span>${t('image')}</span><input type="file" name="img" accept="image/*"></label>
     ${i?.image_url ? `<img src="${esc(i.image_url)}" style="width:90px;height:90px;object-fit:cover;border-radius:10px">` : ''}
+    <label class="field"><span>${App.lang === 'ar' ? 'شارة الصنف' : 'Item badge'}</span><select name="badge">${[['', App.lang === 'ar' ? 'بدون' : 'None'], ['top_seller', App.lang === 'ar' ? '🔥 الأكثر مبيعاً' : '🔥 Top seller'], ['top_rated', App.lang === 'ar' ? '⭐ الأعلى تقييماً' : '⭐ Top rated'], ['new', App.lang === 'ar' ? '✨ جديد' : '✨ New']].map(([v, l]) => `<option value="${v}" ${(i?.badge || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="check"><input type="checkbox" name="is_available" ${i ? (i.is_available ? 'checked' : '') : 'checked'}> ${t('available')}</label>
     <div class="row"><button class="btn primary" type="submit" id="si">${t('save')}</button><button class="btn" type="button" onclick="closeModal()">${t('cancel')}</button>
     <div class="grow"></div>${i ? `<button class="btn danger" type="button" id="di">${t('delete')}</button>` : ''}</div></form>`);
@@ -394,7 +395,7 @@ function itemModal(i, defCat) {
       .filter(g => (g.name_ar || g.name_en) && g.choices.length);
     try {
       const v = { name_ar: f.name_ar.value, name_en: f.name_en.value, description_ar: f.description_ar.value || null, description_en: f.description_en.value || null,
-        price: +f.price.value, prep_minutes: +f.prep_minutes.value, category_id: f.category_id.value || null, is_available: f.is_available.checked, options: cleanOpts };
+        price: +f.price.value, prep_minutes: +f.prep_minutes.value, category_id: f.category_id.value || null, is_available: f.is_available.checked, badge: f.badge.value || null, options: cleanOpts };
       if (f.img.files[0]) v.image_url = await uploadImage(f.img.files[0], 'item');
       const q = i ? sb.from('menu_items').update(v).eq('id', i.id) : sb.from('menu_items').insert({ ...v, restaurant_id: R.id, sort_order: items.length });
       const { error } = await q; if (error) throw error;
@@ -442,7 +443,7 @@ function startOrdersLive() {
 async function paneOrders(silent) {
   if (!silent) $('pane').innerHTML = '<div class="spinner"></div>';
   if (!ordersChannel) startOrdersLive();
-  const { data } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options)').eq('restaurant_id', R.id).neq('status', 'awaiting_payment').order('created_at', { ascending: false }).limit(150);
+  const { data } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options,note)').eq('restaurant_id', R.id).neq('status', 'awaiting_payment').order('created_at', { ascending: false }).limit(150);
   if (tab !== 'orders') return;
   const list = data || [];
   const freshIds = seenOrders ? list.filter(o => !seenOrders.has(o.id)).map(o => o.id) : [];
@@ -460,7 +461,7 @@ async function paneOrders(silent) {
     <div class="card" style="overflow-x:auto"><table><thead><tr><th>#</th><th>🕒</th><th>🚗</th><th>${t('items')}</th><th>${t('total')}</th><th></th></tr></thead><tbody>
     ${list.map(o => `<tr class="${freshIds.includes(o.id) ? 'fresh' : ''}"><td><b>${o.order_number}</b></td><td class="small num">${new Date(o.created_at).toLocaleString(App.lang === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
       <td class="small">${esc([o.car_make, o.car_color].filter(Boolean).join(' · '))} <span dir="ltr"><b>${esc(o.car_plate)}</b></span></td>
-      <td class="small">${o.order_items.map(i => i.qty + '× ' + esc(App.L(i, 'name')) + App.optsText(i.options)).join('، ')}</td>
+      <td class="small">${o.order_items.map(i => i.qty + '× ' + esc(App.L(i, 'name')) + App.optsText(i.options) + (i.note ? ' 📝' + esc(i.note) : '')).join('، ')}</td>
       <td class="num">${App.money(o.total, o.currency)}</td><td><span class="badge ${stBadge[o.status]}">${t(o.status === 'pending' ? 'col_new' : 'status_' + o.status)}</span>
       ${o.payment_status === 'refund_pending' ? `<span class="badge warn">${t('refund_pending')}</span>` : o.payment_method === 'cash' ? `<span class="badge ${o.payment_status === 'paid' ? 'ok' : 'warn'}">💵 ${t(o.payment_status === 'paid' ? 'paid' : 'unpaid')}</span>` : `<span class="badge ok">💳</span>`}</td></tr>`).join('') || `<tr><td colspan="6" class="empty">${t('no_orders')}</td></tr>`}
     </tbody></table></div>`;
@@ -526,6 +527,10 @@ function paneSettings() {
     <label class="field"><span>${t('name_en')}</span><input name="name_en" required dir="ltr" value="${esc(R.name_en)}"></label></div>
     <div class="grid2"><label class="field"><span>${t('slug')}</span><input name="slug" required dir="ltr" pattern="[a-z0-9][a-z0-9\-]{2,39}" value="${esc(R.slug)}"></label>
     <label class="field"><span>${t('phone')}</span><input name="phone" dir="ltr" value="${esc(R.phone || '')}"></label></div>
+    <div class="grid2"><label class="field"><span>${App.lang === 'ar' ? 'نوع المكان (عربي)' : 'Place type (Arabic)'}</span><input name="kind_ar" maxlength="40" placeholder="مطعم · محل حلويات · كوفي هاوس" value="${esc(R.kind_ar || '')}"></label>
+    <label class="field"><span>${App.lang === 'ar' ? 'نوع المكان (إنجليزي)' : 'Place type (English)'}</span><input name="kind_en" maxlength="40" dir="ltr" placeholder="Restaurant · Desserts · Coffee house" value="${esc(R.kind_en || '')}"></label></div>
+    <div class="grid2"><label class="field"><span>${App.lang === 'ar' ? 'يفتح الساعة' : 'Opens at'}</span><input name="open_time" type="time" dir="ltr" value="${(R.open_time || '').slice(0, 5)}"></label>
+    <label class="field"><span>${App.lang === 'ar' ? 'يسكّر الساعة' : 'Closes at'}</span><input name="close_time" type="time" dir="ltr" value="${(R.close_time || '').slice(0, 5)}"></label></div>
     <div class="card flat" style="background:#FBF7F2"><b>${t('payment_methods')}</b>
       <label class="check" style="margin-top:10px"><input type="checkbox" name="accept_card" ${R.accept_card ? 'checked' : ''} ${R.card_provider ? '' : 'disabled'}> 💳 ${t('accept_card')}</label>
       ${R.card_provider ? '' : `<div class="small muted" style="margin-top:4px">${t('gw_card_needs')}</div>`}
@@ -548,7 +553,8 @@ function paneSettings() {
       const v = { is_open: f.is_open.checked, name_ar: f.name_ar.value, name_en: f.name_en.value, slug: slugify(f.slug.value), phone: f.phone.value || null,
         base_prep_minutes: +f.base_prep_minutes.value, per_order_load_minutes: +f.per_order_load_minutes.value, currency: f.currency.value,
         accept_card: !!R.card_provider && f.accept_card.checked, accept_cash: f.accept_cash.checked,
-        preorder_enabled: f.preorder_enabled.checked, preorder_max_hours: +f.preorder_max_hours.value };
+        preorder_enabled: f.preorder_enabled.checked, preorder_max_hours: +f.preorder_max_hours.value,
+        kind_ar: f.kind_ar.value.trim() || null, kind_en: f.kind_en.value.trim() || null, open_time: f.open_time.value || null, close_time: f.close_time.value || null };
       if (!v.accept_card && !v.accept_cash) throw new Error(t('need_one_method'));
       if (f.logo.files[0]) v.logo_url = await uploadImage(f.logo.files[0], 'logo');
       const { error } = await sb.from('restaurants').update(v).eq('id', R.id); if (error) throw error;

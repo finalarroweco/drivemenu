@@ -106,7 +106,7 @@ async function init() {
 }
 
 async function fetchOrders() {
-  const { data, error } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options)')
+  const { data, error } = await sb.from('orders').select('*, order_items(name_ar,name_en,qty,options,note)')
     .eq('restaurant_id', R.id).in('status', ['pending', 'preparing', 'ready']).order('created_at');
   if (error) { App.toast(App.errMsg(error), 'bad'); return; }
   const fresh = data.filter(o => o.status === 'pending' && !seen.has(o.id));
@@ -174,7 +174,7 @@ function card(o) {
       <div class="row wrap" style="margin-top:6px;gap:8px"><span class="plate" dir="ltr">${esc(o.car_plate)}</span>${o.parking_spot ? `<span class="badge">P ${esc(o.parking_spot)}</span>` : ''}</div>
       ${o.customer_name || o.customer_phone ? `<div class="small muted" style="margin-top:6px">${esc(o.customer_name || '')} ${o.customer_phone ? `· <a href="tel:${esc(o.customer_phone)}" dir="ltr">${esc(o.customer_phone)}</a>` : ''}</div>` : ''}
     </div>
-    <div class="its">${o.order_items.map(i => `<div><b>${i.qty}×</b> ${esc(App.L(i, 'name'))}${i.options && i.options.length ? `<div class="small" style="color:var(--brand);padding-inline-start:28px">${i.options.map(x => esc(App.L(x, 'name'))).join(' · ')}</div>` : ''}</div>`).join('')}</div>
+    <div class="its">${o.order_items.map(i => `<div><b>${i.qty}×</b> ${esc(App.L(i, 'name'))}${i.options && i.options.length ? `<div class="small" style="color:var(--brand);padding-inline-start:28px">${i.options.map(x => esc(App.L(x, 'name'))).join(' · ')}</div>` : ''}${i.note ? `<div class="small" style="padding-inline-start:28px;font-weight:700;color:#B45309">📝 ${esc(i.note)}</div>` : ''}</div>`).join('')}</div>
     ${o.notes ? `<div class="small" style="background:var(--warn-soft);padding:6px 10px;border-radius:8px">📝 ${esc(o.notes)}</div>` : ''}
     <div class="row spread" style="margin-top:8px">${o.payment_method === 'cash' && o.payment_status !== 'paid' ? `<span class="badge warn" style="font-size:.9rem">💵 ${t('collect')} ${App.money(o.total, o.currency)}</span>` : `<span class="badge ok">💳 ${t('paid')} ${App.money(o.total, o.currency)}</span>`}${etaTxt}</div>
     ${o.coupon_code ? `<div class="small" style="color:var(--ok);margin-top:4px">🏷 ${esc(o.coupon_code)} · −${App.money(o.discount, o.currency)}</div>` : ''}
