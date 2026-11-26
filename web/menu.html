@@ -181,6 +181,11 @@
   .vlist .item h3 { font-size: .92rem; -webkit-line-clamp: 1; }
   .vlist .item .idesc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font-size: .78rem; line-height: 1.5; color: var(--muted); }
   .vlist .item .ibadge { top: 6px; inset-inline-start: 6px; font-size: .62rem; padding: 1px 6px; }
+  .plus.go { position: relative; }
+  .plus.go svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  [dir="ltr"] .plus.go svg { transform: scaleX(-1); }
+  .plus.go.has { background: var(--brand); }
+  .gq { position: absolute; top: -6px; inset-inline-end: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: var(--ink); color: #fff; font-size: .68rem; font-weight: 800; display: grid; place-items: center; border: 2px solid #fff; }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
@@ -301,7 +306,7 @@ function ctrlHTML(i) {
   const q = itemQty(i.id), key = lineKey(i.id, {});
   return !i.is_available ? ''
     : !R.is_open ? ''
-    : hasOpts(i) ? `<button class="plus ${q ? 'has' : ''}" data-pick="${i.id}" aria-label="${t('add_to_cart')}">${q ? '×' + q : '+'}</button>`
+    : hasOpts(i) ? `<button class="plus go ${q ? 'has' : ''}" data-pick="${i.id}" aria-label="${LL('اختر الإضافات', 'Customize')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>${q ? `<span class="gq">${q}</span>` : ''}</button>`
     : q ? `<span class="stepper"><button data-dec="${esc(key)}" aria-label="-">−</button><span>${q}</span><button data-inc="${esc(key)}" aria-label="+">+</button></span>`
     : `<button class="plus" data-add="${i.id}" aria-label="${t('add_to_cart')}">+</button>`;
 }
