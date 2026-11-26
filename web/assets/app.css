@@ -108,3 +108,7 @@ th { font-size: .8rem; color: var(--muted); font-weight: 600; }
 .spinner { width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; margin: 30px auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .num { font-variant-numeric: tabular-nums; }
+
+.langsw { display: inline-flex; align-items: center; padding: 3px; gap: 2px; border-radius: 999px; border: 1px solid var(--line); background: #F4F1EC; cursor: pointer; font: inherit; flex: none; }
+.langsw span { min-width: 34px; padding: 5px 8px; border-radius: 999px; font-size: .78rem; font-weight: 700; letter-spacing: .5px; color: var(--muted); text-align: center; line-height: 1.2; transition: background .15s, color .15s; }
+.langsw span.on { background: var(--ink); color: #fff; }

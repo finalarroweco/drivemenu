@@ -23,6 +23,7 @@
       document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
       document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = App.t(el.dataset.i18n); });
       document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = App.t(el.dataset.i18nPh); });
+      document.querySelectorAll('[data-lang-toggle]').forEach(el => { el.setAttribute('dir', 'ltr'); el.innerHTML = `<span class="${lang === 'ar' ? 'on' : ''}" data-l="ar">AR</span><span class="${lang === 'en' ? 'on' : ''}" data-l="en">EN</span>`; });
     },
     // pick localized field: obj.name_ar / obj.name_en
     L(obj, field) {
@@ -94,6 +95,6 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     App.applyLang();
-    document.querySelectorAll('[data-lang-toggle]').forEach(b => b.addEventListener('click', App.toggleLang));
+    document.querySelectorAll('[data-lang-toggle]').forEach(b => b.addEventListener('click', e => { const l = e.target.closest('[data-l]')?.dataset.l; if (l) { if (l !== App.lang) App.setLang(l); } else App.toggleLang(); }));
   });
 })();
