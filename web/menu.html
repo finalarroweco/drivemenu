@@ -17,7 +17,7 @@
   .hero { padding: 18px 0 6px; display: flex; gap: 14px; align-items: center; }
   .r-logo { width: 64px; height: 64px; border-radius: 18px; object-fit: cover; background: var(--brand-soft); display: grid; place-items: center; font-size: 28px; flex: none; border: 1px solid var(--line); }
   .hero h1 { font-size: 1.45rem; margin: 0 0 4px; }
-  .cats { position: sticky; top: 56px; z-index: 10; background: #fff; display: flex; gap: 4px; overflow-x: auto; margin: 10px -16px 0; padding: 0 12px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+  .cats { position: sticky; top: 56px; z-index: 10; background: #fff; display: flex; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; margin: 10px -16px 0; padding: 0 12px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
   .cats::-webkit-scrollbar { display: none; }
   .chip { flex: none; margin: 9px 0; padding: 7px 14px; border-radius: 999px; border: 0; background: none; font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer; color: var(--muted); white-space: nowrap; }
   .chip.active { color: #fff; background: var(--brand); }
@@ -276,7 +276,7 @@ function render() {
       <span class="${R.is_open ? 'open' : 'shut'}">● ${R.is_open ? LL('مفتوح الآن', 'Open now') : LL('مغلق الآن', 'Closed now')}</span>
       ${R.open_time && R.close_time ? `<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><bdi>${fmtTime(R.open_time)} – ${fmtTime(R.close_time)}</bdi></span>` : ''}
       <span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/></svg>~${R.base_prep_minutes}+ ${t('minutes')}</span>
-      ${R.location_url ? `<a class="loc" href="${esc(R.location_url)}" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(App.L(R, 'address') || LL('الموقع', 'Location'))}</a>` : ''}
+      ${(R.location_url || App.L(R, 'address')) ? `<a class="loc" href="${esc(R.location_url || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((R.name_en || R.name_ar) + ' ' + (R.address_en || R.address_ar)))}" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(App.L(R, 'address') || LL('الموقع', 'Location'))}</a>` : ''}
     </div>
     ${!R.is_open ? `<div class="closed">${t('closed_msg')}</div>` : ''}
     ${last && Date.now() - last.at < 6 * 3600e3 ? `<a class="lastorder" href="/o/${last.id}?t=${last.token}"><span>${t('track_title')} #${last.n}</span><span>←</span></a>` : ''}
@@ -284,7 +284,7 @@ function render() {
     ${groups.map(g => `<section class="sec" id="cat-${g.c.id}" data-sec="${g.c.id}"><h2 class="sec-title">${esc(App.L(g.c, 'name'))}</h2>${g.top ? `<div class="tops">${g.list.map(topCard).join('')}</div>` : g.list.map(itemHTML).join('')}</section>`).join('')}
     ${!items.length ? `<div class="empty">🍳 ${t('menu_empty')}</div>` : ''}
     </div>`;
-  const nav = document.querySelector('.cats'); if (nav) nav.scrollLeft = tabsX;
+  const nav = document.querySelector('.cats'); if (nav) { const max = nav.scrollWidth - nav.clientWidth, rtl = getComputedStyle(nav).direction === 'rtl'; nav.scrollLeft = rtl ? Math.min(0, Math.max(-max, tabsX)) : Math.max(0, Math.min(max, tabsX)); }
   renderBar();
 }
 
@@ -292,8 +292,14 @@ let activeCat = null, spyLock = 0;
 function setActiveCat(id) {
   activeCat = id;
   document.querySelectorAll('.chip').forEach(c => { const on = c.dataset.cat === id; c.classList.toggle('active', on);
-    if (on) { const nav = c.parentElement, r = c.getBoundingClientRect(), nr = nav.getBoundingClientRect();
-      if (r.left < nr.left + 8 || r.right > nr.right - 8) nav.scrollBy({ left: (r.left + r.width / 2) - (nr.left + nr.width / 2), behavior: 'smooth' }); } });
+    if (on) {
+      const nav = c.parentElement, r = c.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+      if (r.left >= nr.left + 8 && r.right <= nr.right - 8) return;
+      const max = nav.scrollWidth - nav.clientWidth, rtl = getComputedStyle(nav).direction === 'rtl';
+      let target = nav.scrollLeft + (r.left + r.width / 2) - (nr.left + nr.width / 2);
+      target = rtl ? Math.min(0, Math.max(-max, target)) : Math.max(0, Math.min(max, target));
+      nav.scrollTo({ left: target, behavior: 'smooth' });
+    } });
 }
 addEventListener('scroll', () => {
   $('mtop').classList.toggle('scrolled', scrollY > 70);
