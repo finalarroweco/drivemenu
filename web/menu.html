@@ -106,6 +106,11 @@
   .pk-note { display: block; margin-top: 14px; }
   .pk-note textarea { margin-top: 6px; resize: none; }
   .pk-foot { margin-top: 14px; position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 2px; }
+  .cover { margin: 0 -16px; height: 190px; overflow: hidden; background: #F3EEE7; }
+  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  @media (min-width: 600px) { .cover { margin: 12px 0 0; height: 230px; border-radius: 20px; } }
+  .hero.has-cover { align-items: flex-end; padding-top: 0; }
+  .hero.has-cover .r-logo { width: 84px; height: 84px; border-radius: 22px; margin-top: -42px; border: 4px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.12); background: #fff; }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
@@ -208,7 +213,7 @@ function saveDraft() {
 
 async function load() {
   if (!slug) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
-  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,subscription_until,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours,kind_ar,kind_en,open_time,close_time').eq('slug', slug).maybeSingle();
+  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,subscription_until,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours,kind_ar,kind_en,open_time,close_time,cover_url').eq('slug', slug).maybeSingle();
   if (!r) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
   R = r;
   if (r.is_suspended) { $('root').innerHTML = `<div class="empty">${t('suspended_msg')}</div>`; return; }
@@ -256,7 +261,8 @@ function render() {
   const tabsX = document.querySelector('.cats')?.scrollLeft || 0;
   $('topName').textContent = App.L(R, 'name');
   $('root').innerHTML = `
-    <div class="hero">
+    ${R.cover_url ? `<div class="cover"><img src="${esc(R.cover_url)}" alt=""></div>` : ''}
+    <div class="hero ${R.cover_url ? 'has-cover' : ''}">
       ${R.logo_url ? `<img class="r-logo" src="${esc(R.logo_url)}" alt="">` : `<div class="r-logo">🍽</div>`}
       <div><h1>${esc(App.L(R, 'name'))}</h1>${App.L(R, 'kind') ? `<div class="kind">${esc(App.L(R, 'kind'))}</div>` : ''}
         <div class="meta"><span class="${R.is_open ? 'open' : 'shut'}">● ${R.is_open ? LL('مفتوح الآن', 'Open now') : LL('مغلق الآن', 'Closed now')}</span>

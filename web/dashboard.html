@@ -544,6 +544,8 @@ function paneSettings() {
     <label class="field"><span>${t('payment_mode')}</span><select name="payment_mode" disabled><option value="test">${t('mode_test')}</option><option value="live">${t('mode_live')}</option></select></label></div>
     <label class="field"><span>${t('logo')}</span><input type="file" name="logo" accept="image/*"></label>
     ${R.logo_url ? `<img src="${esc(R.logo_url)}" style="width:72px;height:72px;border-radius:16px;object-fit:cover">` : ''}
+    <label class="field"><span>${App.lang === 'ar' ? 'صورة الغلاف (تظهر فوق اسم المطعم بالمنيو، يفضّل بالعرض)' : 'Cover photo (shown above the name on the menu, landscape works best)'}</span><input type="file" name="cover" accept="image/*"></label>
+    ${R.cover_url ? `<div class="row" style="gap:10px;align-items:center"><img src="${esc(R.cover_url)}" style="width:220px;height:90px;border-radius:14px;object-fit:cover"><label class="check"><input type="checkbox" name="cover_remove"> ${App.lang === 'ar' ? 'إزالة الغلاف' : 'Remove cover'}</label></div>` : ''}
     <div><button class="btn primary lg" id="sset">${t('save')}</button></div></form></div>
     <div class="card" style="max-width:720px;margin-top:16px" id="gwBox"><div class="spinner"></div></div>`;
   renderGateway();
@@ -557,6 +559,7 @@ function paneSettings() {
         kind_ar: f.kind_ar.value.trim() || null, kind_en: f.kind_en.value.trim() || null, open_time: f.open_time.value || null, close_time: f.close_time.value || null };
       if (!v.accept_card && !v.accept_cash) throw new Error(t('need_one_method'));
       if (f.logo.files[0]) v.logo_url = await uploadImage(f.logo.files[0], 'logo');
+      if (f.cover.files[0]) v.cover_url = await uploadImage(f.cover.files[0], 'cover'); else if (f.cover_remove?.checked) v.cover_url = null;
       const { error } = await sb.from('restaurants').update(v).eq('id', R.id); if (error) throw error;
       App.toast(t('saved'), 'ok'); await loadMems(R.id);
     } catch (err) { App.toast(err.message === t('need_one_method') ? err.message : App.errMsg(err), 'bad'); $('sset').disabled = false; }
