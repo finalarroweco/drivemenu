@@ -173,6 +173,14 @@
   .cartbar #btnCart { background: var(--ink); border-color: var(--ink); color: #fff; box-shadow: 0 12px 28px rgba(28,26,23,.35); border-radius: 18px; align-items: center; }
   .cb-l { display: inline-flex; align-items: center; gap: 10px; }
   .cb-n { min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; background: var(--brand); display: inline-grid; place-items: center; font-size: .9rem; }
+  .item .idesc { display: none; }
+  .vlist .grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .vlist .item { flex-direction: row; }
+  .vlist .item .media, .vlist .item .media.noimg { width: 108px; aspect-ratio: auto; height: auto; min-height: 108px; flex: none; }
+  .vlist .item .info { padding: 10px 12px; gap: 4px; }
+  .vlist .item h3 { font-size: .92rem; -webkit-line-clamp: 1; }
+  .vlist .item .idesc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font-size: .78rem; line-height: 1.5; color: var(--muted); }
+  .vlist .item .ibadge { top: 6px; inset-inline-start: 6px; font-size: .62rem; padding: 1px 6px; }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
@@ -181,6 +189,7 @@
 <body>
 <header class="mtop" id="mtop"><div class="in">
   <button class="ibtn" id="btnShare" aria-label="share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/></svg></button>
+  <button class="ibtn" id="btnView" aria-label="view"></button>
   <span class="tname" id="topName"></span>
   <button class="langsw" data-lang-toggle aria-label="Language"></button>
 </div></header>
@@ -308,7 +317,7 @@ function topCard(i, k) {
 function itemHTML(i) {
   return `<div class="item ${i.is_available ? '' : 'off'}" data-open="${i.id}">
     <div class="media">${picHTML(i)}${badgeHTML(i)}${!i.is_available ? `<span class="soldout">${t('unavailable')}</span>` : ''}</div>
-    <div class="info"><h3>${esc(App.L(i, 'name'))}</h3>
+    <div class="info"><h3>${esc(App.L(i, 'name'))}</h3>${App.L(i, 'description') ? `<p class="idesc">${esc(App.L(i, 'description'))}</p>` : ''}
       <div class="prow"><span class="price num">${money(i.price)}</span>${ctrlHTML(i)}</div></div>
   </div>`;
 }
@@ -367,6 +376,18 @@ addEventListener('scroll', () => {
   if (!cur) cur = document.querySelector('section[data-sec]')?.dataset.sec;
   if (cur && cur !== activeCat) setActiveCat(cur);
 }, { passive: true });
+const VIEW_ICONS = {
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M14 6h6M14 9h4M14 16h6M14 19h4"/></svg>'
+};
+let viewMode = 'grid'; try { viewMode = localStorage.getItem('menu-view') === 'list' ? 'list' : 'grid'; } catch (e) {}
+function applyView() {
+  document.body.classList.toggle('vlist', viewMode === 'list');
+  $('btnView').innerHTML = VIEW_ICONS[viewMode === 'list' ? 'grid' : 'list'];
+  $('btnView').setAttribute('aria-label', viewMode === 'list' ? LL('عرض شبكة', 'Grid view') : LL('عرض قائمة', 'List view'));
+}
+applyView();
+$('btnView').onclick = () => { viewMode = viewMode === 'list' ? 'grid' : 'list'; try { localStorage.setItem('menu-view', viewMode); } catch (e) {} const y = scrollY; applyView(); scrollTo(0, y); };
 $('btnShare').onclick = async () => {
   const url = location.href.split('?')[0], title = R ? App.L(R, 'name') : document.title;
   try { if (navigator.share) await navigator.share({ title, url }); else { await navigator.clipboard.writeText(url); $('btnShare').style.background = 'var(--ok-soft)'; setTimeout(() => $('btnShare').style.background = '', 1200); } } catch (e) {}
