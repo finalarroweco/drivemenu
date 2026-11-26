@@ -17,9 +17,6 @@
   .hero { padding: 18px 0 6px; display: flex; gap: 14px; align-items: center; }
   .r-logo { width: 64px; height: 64px; border-radius: 18px; object-fit: cover; background: var(--brand-soft); display: grid; place-items: center; font-size: 28px; flex: none; border: 1px solid var(--line); }
   .hero h1 { font-size: 1.45rem; margin: 0 0 4px; }
-  .hero .meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: .84rem; color: var(--muted); }
-  .hero .meta span { background: #F4F1EC; border-radius: 999px; padding: 3px 10px; }
-  .hero .meta .open { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
   .cats { position: sticky; top: 56px; z-index: 10; background: #fff; display: flex; gap: 4px; overflow-x: auto; margin: 10px -16px 0; padding: 0 12px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
   .cats::-webkit-scrollbar { display: none; }
   .chip { flex: none; margin: 9px 0; padding: 7px 14px; border-radius: 999px; border: 0; background: none; font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer; color: var(--muted); white-space: nowrap; }
@@ -78,8 +75,6 @@
   .mny { display: inline-flex; align-items: center; gap: .28em; white-space: nowrap; unicode-bidi: isolate; }
   .rial { width: 1.05em; height: .85em; flex: none; margin-top: -.12em; }
   .kind { font-size: .9rem; color: var(--muted); margin: -2px 0 6px; }
-  .hero .meta .shut { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
-  .hero .meta span { display: inline-flex; align-items: center; gap: 4px; }
   .ic { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   .item[data-open], .tcard { cursor: pointer; }
   .ibadge { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; font-weight: 700; border-radius: 999px; padding: 2px 9px; margin-bottom: 5px; width: fit-content; }
@@ -106,11 +101,21 @@
   .pk-note { display: block; margin-top: 14px; }
   .pk-note textarea { margin-top: 6px; resize: none; }
   .pk-foot { margin-top: 14px; position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 2px; }
-  .cover { margin: 0 -16px; height: 190px; overflow: hidden; background: #F3EEE7; }
-  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  @media (min-width: 600px) { .cover { margin: 12px 0 0; height: 230px; border-radius: 20px; } }
-  .hero.has-cover { align-items: flex-end; padding-top: 0; }
+  .hero.has-cover { align-items: flex-end; padding-top: 0; padding-bottom: 4px; }
   .hero.has-cover .r-logo { width: 84px; height: 84px; border-radius: 22px; margin-top: -42px; border: 4px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.12); background: #fff; }
+  .meta { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 2px -16px 4px; padding: 4px 16px 6px; font-size: .74rem; color: var(--muted); }
+  .meta::-webkit-scrollbar { display: none; }
+  .meta > span, .meta > a { flex: none; display: inline-flex; align-items: center; gap: 4px; background: #F4F1EC; border-radius: 999px; padding: 4px 9px; white-space: nowrap; color: var(--muted); text-decoration: none; font-weight: 500; }
+  .meta .open { background: var(--ok-soft); color: var(--ok); font-weight: 700; }
+  .meta .shut { background: var(--bad-soft); color: var(--bad); font-weight: 700; }
+  .meta .loc { background: #EAF2FF; color: #1D4ED8; font-weight: 700; }
+  .meta .ic { width: 12px; height: 12px; }
+  .hero-txt { min-width: 0; }
+  .cover { position: sticky; top: 56px; z-index: 0; margin: 0 -16px; height: 220px; overflow: hidden; background: #F3EEE7; }
+  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  .body-card { position: relative; z-index: 2; background: #fff; border-radius: 24px 24px 0 0; margin: -26px -16px 0; padding: 0 16px; box-shadow: 0 -6px 18px rgba(0,0,0,.06); }
+  @media (min-width: 600px) { .cover { margin: 0; border-radius: 0 0 20px 20px; } }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
@@ -213,7 +218,7 @@ function saveDraft() {
 
 async function load() {
   if (!slug) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
-  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,subscription_until,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours,kind_ar,kind_en,open_time,close_time,cover_url').eq('slug', slug).maybeSingle();
+  const { data: r } = await sb.from('restaurants').select('id,slug,name_ar,name_en,logo_url,currency,is_open,is_suspended,subscription_until,base_prep_minutes,timezone,preorder_enabled,preorder_max_hours,kind_ar,kind_en,open_time,close_time,cover_url,location_url,address_ar,address_en').eq('slug', slug).maybeSingle();
   if (!r) { $('root').innerHTML = `<div class="empty">${t('not_found')}</div>`; return; }
   R = r;
   if (r.is_suspended) { $('root').innerHTML = `<div class="empty">${t('suspended_msg')}</div>`; return; }
@@ -261,19 +266,24 @@ function render() {
   const tabsX = document.querySelector('.cats')?.scrollLeft || 0;
   $('topName').textContent = App.L(R, 'name');
   $('root').innerHTML = `
-    ${R.cover_url ? `<div class="cover"><img src="${esc(R.cover_url)}" alt=""></div>` : ''}
+    ${R.cover_url ? `<div class="cover"><img src="${esc(R.cover_url)}" alt=""><div class="cover-shade" id="coverShade"></div></div>` : ''}
+    <div class="${R.cover_url ? 'body-card' : ''}">
     <div class="hero ${R.cover_url ? 'has-cover' : ''}">
       ${R.logo_url ? `<img class="r-logo" src="${esc(R.logo_url)}" alt="">` : `<div class="r-logo">🍽</div>`}
-      <div><h1>${esc(App.L(R, 'name'))}</h1>${App.L(R, 'kind') ? `<div class="kind">${esc(App.L(R, 'kind'))}</div>` : ''}
-        <div class="meta"><span class="${R.is_open ? 'open' : 'shut'}">● ${R.is_open ? LL('مفتوح الآن', 'Open now') : LL('مغلق الآن', 'Closed now')}</span>
-        ${R.open_time && R.close_time ? `<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <bdi>${fmtTime(R.open_time)} – ${fmtTime(R.close_time)}</bdi></span>` : ''}
-        <span>⏱ ~${R.base_prep_minutes}+ ${t('minutes')}</span></div></div>
+      <div class="hero-txt"><h1>${esc(App.L(R, 'name'))}</h1>${App.L(R, 'kind') ? `<div class="kind">${esc(App.L(R, 'kind'))}</div>` : ''}</div>
+    </div>
+    <div class="meta">
+      <span class="${R.is_open ? 'open' : 'shut'}">● ${R.is_open ? LL('مفتوح الآن', 'Open now') : LL('مغلق الآن', 'Closed now')}</span>
+      ${R.open_time && R.close_time ? `<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><bdi>${fmtTime(R.open_time)} – ${fmtTime(R.close_time)}</bdi></span>` : ''}
+      <span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/></svg>~${R.base_prep_minutes}+ ${t('minutes')}</span>
+      ${R.location_url ? `<a class="loc" href="${esc(R.location_url)}" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(App.L(R, 'address') || LL('الموقع', 'Location'))}</a>` : ''}
     </div>
     ${!R.is_open ? `<div class="closed">${t('closed_msg')}</div>` : ''}
     ${last && Date.now() - last.at < 6 * 3600e3 ? `<a class="lastorder" href="/o/${last.id}?t=${last.token}"><span>${t('track_title')} #${last.n}</span><span>←</span></a>` : ''}
     ${groups.length > 1 ? `<nav class="cats">${groups.map((g, k) => `<button class="chip ${(activeCat ? activeCat === g.c.id : !k) ? 'active' : ''}" data-cat="${g.c.id}">${esc(App.L(g.c, 'name'))}</button>`).join('')}</nav>` : ''}
     ${groups.map(g => `<section class="sec" id="cat-${g.c.id}" data-sec="${g.c.id}"><h2 class="sec-title">${esc(App.L(g.c, 'name'))}</h2>${g.top ? `<div class="tops">${g.list.map(topCard).join('')}</div>` : g.list.map(itemHTML).join('')}</section>`).join('')}
-    ${!items.length ? `<div class="empty">🍳 ${t('menu_empty')}</div>` : ''}`;
+    ${!items.length ? `<div class="empty">🍳 ${t('menu_empty')}</div>` : ''}
+    </div>`;
   const nav = document.querySelector('.cats'); if (nav) nav.scrollLeft = tabsX;
   renderBar();
 }
@@ -287,6 +297,7 @@ function setActiveCat(id) {
 }
 addEventListener('scroll', () => {
   $('mtop').classList.toggle('scrolled', scrollY > 70);
+  const sh = $('coverShade'); if (sh) sh.style.opacity = Math.min(scrollY / 260, 0.55);
   if (Date.now() < spyLock) return;
   let cur = null; document.querySelectorAll('section[data-sec]').forEach(sec => { if (sec.getBoundingClientRect().top <= 130) cur = sec.dataset.sec; });
   if (!cur) cur = document.querySelector('section[data-sec]')?.dataset.sec;

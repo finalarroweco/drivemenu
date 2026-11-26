@@ -529,6 +529,9 @@ function paneSettings() {
     <label class="field"><span>${t('phone')}</span><input name="phone" dir="ltr" value="${esc(R.phone || '')}"></label></div>
     <div class="grid2"><label class="field"><span>${App.lang === 'ar' ? 'نوع المكان (عربي)' : 'Place type (Arabic)'}</span><input name="kind_ar" maxlength="40" placeholder="مطعم · محل حلويات · كوفي هاوس" value="${esc(R.kind_ar || '')}"></label>
     <label class="field"><span>${App.lang === 'ar' ? 'نوع المكان (إنجليزي)' : 'Place type (English)'}</span><input name="kind_en" maxlength="40" dir="ltr" placeholder="Restaurant · Desserts · Coffee house" value="${esc(R.kind_en || '')}"></label></div>
+    <label class="field"><span>${App.lang === 'ar' ? 'رابط الموقع على خرائط جوجل' : 'Google Maps link'}</span><input name="location_url" type="url" dir="ltr" placeholder="https://maps.app.goo.gl/…" value="${esc(R.location_url || '')}"></label>
+    <div class="grid2"><label class="field"><span>${App.lang === 'ar' ? 'اسم المنطقة (عربي) — اختياري' : 'Area name (Arabic) — optional'}</span><input name="address_ar" maxlength="40" placeholder="مثال: القرم" value="${esc(R.address_ar || '')}"></label>
+    <label class="field"><span>${App.lang === 'ar' ? 'اسم المنطقة (إنجليزي) — اختياري' : 'Area name (English) — optional'}</span><input name="address_en" maxlength="40" dir="ltr" placeholder="e.g. Qurum" value="${esc(R.address_en || '')}"></label></div>
     <div class="grid2"><label class="field"><span>${App.lang === 'ar' ? 'يفتح الساعة' : 'Opens at'}</span><input name="open_time" type="time" dir="ltr" value="${(R.open_time || '').slice(0, 5)}"></label>
     <label class="field"><span>${App.lang === 'ar' ? 'يسكّر الساعة' : 'Closes at'}</span><input name="close_time" type="time" dir="ltr" value="${(R.close_time || '').slice(0, 5)}"></label></div>
     <div class="card flat" style="background:#FBF7F2"><b>${t('payment_methods')}</b>
@@ -556,7 +559,8 @@ function paneSettings() {
         base_prep_minutes: +f.base_prep_minutes.value, per_order_load_minutes: +f.per_order_load_minutes.value, currency: f.currency.value,
         accept_card: !!R.card_provider && f.accept_card.checked, accept_cash: f.accept_cash.checked,
         preorder_enabled: f.preorder_enabled.checked, preorder_max_hours: +f.preorder_max_hours.value,
-        kind_ar: f.kind_ar.value.trim() || null, kind_en: f.kind_en.value.trim() || null, open_time: f.open_time.value || null, close_time: f.close_time.value || null };
+        kind_ar: f.kind_ar.value.trim() || null, kind_en: f.kind_en.value.trim() || null, open_time: f.open_time.value || null, close_time: f.close_time.value || null,
+        location_url: /^https:\/\//i.test(f.location_url.value.trim()) ? f.location_url.value.trim() : null, address_ar: f.address_ar.value.trim() || null, address_en: f.address_en.value.trim() || null };
       if (!v.accept_card && !v.accept_cash) throw new Error(t('need_one_method'));
       if (f.logo.files[0]) v.logo_url = await uploadImage(f.logo.files[0], 'logo');
       if (f.cover.files[0]) v.cover_url = await uploadImage(f.cover.files[0], 'cover'); else if (f.cover_remove?.checked) v.cover_url = null;
