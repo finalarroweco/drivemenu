@@ -362,7 +362,7 @@ addEventListener('scroll', () => {
   $('mtop').classList.toggle('scrolled', scrollY > 70);
   const sh = $('coverShade'); if (sh) sh.style.opacity = Math.min(scrollY / 260, 0.55);
   if (Date.now() < spyLock) return;
-  let cur = null; document.querySelectorAll('section[data-sec]').forEach(sec => { if (sec.getBoundingClientRect().top <= 190) cur = sec.dataset.sec; });
+  let cur = null; document.querySelectorAll('section[data-sec]').forEach(sec => { if (sec.getBoundingClientRect().top <= 230) cur = sec.dataset.sec; });
   if (!cur) cur = document.querySelector('section[data-sec]')?.dataset.sec;
   if (cur && cur !== activeCat) setActiveCat(cur);
 }, { passive: true });
